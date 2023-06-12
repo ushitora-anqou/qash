@@ -1,2 +1,3 @@
-(test
- (name qash))
+(tests
+ (names test_parser)
+ (libraries qash alcotest))

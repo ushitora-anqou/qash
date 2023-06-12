@@ -1,2 +1,12 @@
+(menhir
+ (flags (--explain))
+ (modules p))
+
+(ocamllex
+ (modules l))
+
 (library
- (name qash))
+ (name qash)
+ (preprocess
+  (pps ppx_deriving.make ppx_deriving.show))
+ (libraries csv pcre))
