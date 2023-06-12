@@ -1,0 +1,4 @@
+(executable
+ (public_name qash)
+ (name main)
+ (libraries qash))
