@@ -8,5 +8,5 @@
 (library
  (name qash)
  (preprocess
-  (pps ppx_deriving.make ppx_deriving.show))
+  (pps ppx_deriving.make ppx_deriving.show ppx_yojson_conv))
  (libraries csv pcre))

@@ -3,60 +3,54 @@ open Qash
 let test_case1 () =
   let prog =
     {|
-!open-account 1871-06-27 資産:流動資産:現金 JPY
+!open-account 資産:流動資産:現金 JPY
 
-* 2014-05-05 "信販C ラクテンカ-ドサ-ビ"
-  資産:流動資産:南都銀行普通預金  -400,000
-  負債:楽天クレジットカード                  400,000
-* 2023-05-08 "セブンイレブン"
+* 2014-05-05 "信販C ピヨカ-ドサ-ビ"
+  資産:流動資産:ほげ銀行普通預金  -400,000
+  負債:ぴよクレジットカード                  400,000
+* 2023-05-08 "コンビニ"
   資産:流動資産:現金  -502
   費用:食費           502
 
-* 2023-05-08 "セブンイレブン"
+* 2023-05-08 "コンビニ"
   資産:流動資産:現金  -502
   費用:食費           502
 
-!import-csv "moneyforward/202305.csv"
+!import "moneyforward/202305.qash"
 
-!import-csv "moneyforward/202306.csv"
-  * 2014-05-05 "信販C ラクテンカ-ドサ-ビ"
-    資産:流動資産:南都銀行普通預金            -400,000
-    負債:楽天クレジットカード                  400,000
-  * 2014-05-05 "信販C ラクテンカ-ドサ-ビ"
-    資産:流動資産:南都銀行普通預金            -400,000
-    負債:楽天クレジットカード                  400,000
+!import "moneyforward/202306.qash"
+  * 2014-05-05 "信販C ピヨカ-ドサ-ビ"
+    資産:流動資産:ほげ銀行普通預金            -400,000
+    負債:ぴよクレジットカード                  400,000
+  * 2014-05-05 "信販C ピヨカ-ドサ-ビ"
+    資産:流動資産:ほげ銀行普通預金            -400,000
+    負債:ぴよクレジットカード                  400,000
   
-  * 2023-05-08 "セブンイレブン"
+  * 2023-05-08 "コンビニ"
     資産:流動資産:現金  -502
     費用:食費            502
 
-  * 2023-05-08 "セブンイレブン"
+  * 2023-05-08 "コンビニ"
     資産:流動資産:現金  -502
     費用:食費            502
 |}
   in
+
   let expected_open_account1 =
     let open Model in
-    OpenAccount
-      {
-        date = make_date ~year:1871 ~month:6 ~day:27;
-        account = [ "資産"; "流動資産"; "現金" ];
-        currency = "JPY";
-      }
+    OpenAccount { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY" }
   in
   let expected_transaction1 =
     let open Model in
     {
       date = make_date ~year:2014 ~month:5 ~day:5;
-      flag = "*";
-      narration = Some "信販C ラクテンカ-ドサ-ビ";
-      payee = None;
+      narration = "信販C ピヨカ-ドサ-ビ";
       postings =
         [
           make_posting
-            ~account:[ "資産"; "流動資産"; "南都銀行普通預金" ]
+            ~account:[ "資産"; "流動資産"; "ほげ銀行普通預金" ]
             ~amount:(-400000) ();
-          make_posting ~account:[ "負債"; "楽天クレジットカード" ] ~amount:400000 ();
+          make_posting ~account:[ "負債"; "ぴよクレジットカード" ] ~amount:400000 ();
         ];
     }
   in
@@ -64,9 +58,7 @@ let test_case1 () =
     let open Model in
     {
       date = make_date ~year:2023 ~month:5 ~day:8;
-      flag = "*";
-      narration = Some "セブンイレブン";
-      payee = None;
+      narration = "コンビニ";
       postings =
         [
           make_posting ~account:[ "資産"; "流動資産"; "現金" ] ~amount:(-502) ();
@@ -74,15 +66,15 @@ let test_case1 () =
         ];
     }
   in
-  let expected_import_csv1 =
+  let expected_import1 =
     let open Model in
-    ImportCSV { filename = "moneyforward/202305.csv"; transactions = [] }
+    Import { filename = "moneyforward/202305.qash"; transactions = [] }
   in
-  let expected_import_csv2 =
+  let expected_import2 =
     let open Model in
-    ImportCSV
+    Import
       {
-        filename = "moneyforward/202306.csv";
+        filename = "moneyforward/202306.qash";
         transactions =
           [
             expected_transaction1;
@@ -98,8 +90,8 @@ let test_case1 () =
       Transaction expected_transaction1;
       Transaction expected_transaction2;
       Transaction expected_transaction2;
-      expected_import_csv1;
-      expected_import_csv2;
+      expected_import1;
+      expected_import2;
     ]
   in
   match Parser.parse_string prog with

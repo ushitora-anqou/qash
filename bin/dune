@@ -1,4 +1,4 @@
 (executable
  (public_name qash)
  (name main)
- (libraries qash cmdliner))
+ (libraries qash cmdliner yojson))

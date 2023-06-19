@@ -31,7 +31,7 @@ rule main = parse
 }
 | '!' [ 'a'-'z' 'A'-'Z' '0'-'9' '_' '-' ]+ as s {
   match s with
-  | "!import-csv" -> P.K_IMPORT_CSV
+  | "!import" -> P.K_IMPORT
   | "!open-account" -> P.K_OPEN_ACCOUNT
   | _ -> raise (Error ("unknown keyword: " ^ s))
 }

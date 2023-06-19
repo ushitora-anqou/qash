@@ -1,10 +1,22 @@
 open Qash
 open Util
 
-let gnucash_to_source transactions_csv_filename =
+let to_json filename =
+  match Parser.parse_file filename with
+  | Error s -> failwith s
+  | Ok r ->
+      Model.yojson_of_directives r |> Yojson.Safe.to_string |> print_endline
+
+let of_json filename =
+  with_file filename @@ fun ic ->
+  Yojson.Safe.from_channel ic
+  |> Model.directives_of_yojson |> Model.string_of_directives |> print_endline
+
+let of_gnucash_csv transactions_csv_filename =
   with_file transactions_csv_filename @@ fun ic ->
   let csv = Csv.of_channel ic in
   let _ = Csv.next csv (* Skip header row *) in
+
   let date_re =
     Regex.e {|^([0-9][0-9][0-9][0-9])年([0-9][0-9])月([0-9][0-9])日$|}
   in
@@ -29,7 +41,7 @@ let gnucash_to_source transactions_csv_filename =
               ~date:
                 (make_date ~year:(int_of_string year)
                    ~month:(int_of_string month) ~day:(int_of_string day))
-              ~flag:"*" ~narration:transaction_narration
+              ~narration:transaction_narration
               ~postings:
                 [
                   make_posting ~account ~amount ~narration:posting_narration ();
@@ -55,17 +67,26 @@ let gnucash_to_source transactions_csv_filename =
             | Some cur ->
                 (Some { cur with postings = posting :: cur.postings }, acc)))
   in
-  let acc = cur |> Option.fold ~none:acc ~some:(fun x -> x :: acc) in
-  let acc =
-    acc
+  let transactions =
+    cur
+    |> Option.fold ~none:acc ~some:(fun x -> x :: acc)
     |> List.sort (fun Model.{ date = lhs; _ } Model.{ date = rhs; _ } ->
-           compare
-             [ lhs.year; lhs.month; lhs.day ]
-             [ rhs.year; rhs.month; rhs.day ])
+           Model.date_compare lhs rhs)
   in
-  acc
-  |> List.iter (fun txn ->
-         Model.string_of_transaction txn |> Printf.printf "%s\n")
+
+  let open_accounts =
+    transactions
+    |> List.map (fun t ->
+           let open Model in
+           t.postings |> List.map (fun (p : posting) -> p.account))
+    |> List.flatten |> List.sort_uniq compare
+    |> List.map (fun account ->
+           Model.make_open_account ~account ~currency:"JPY")
+  in
+
+  (open_accounts |> List.map (fun p -> Model.OpenAccount p))
+  @ (transactions |> List.map (fun txn -> Model.Transaction txn))
+  |> Model.string_of_directives |> print_endline
 
 let check filename =
   match Parser.parse_file filename with Ok _ -> () | Error s -> failwith s
@@ -76,13 +97,21 @@ let () =
     group
       (info "qash" ~version:"0.1.0" ~doc:"A command-line accounting tool")
       [
-        v (info "gnucash-to-source")
+        v (info "of-gnucash-csv")
           Term.(
-            const gnucash_to_source
+            const of_gnucash_csv
             $ Arg.(
                 required
                 & pos 0 (some string) None
                 & info ~docv:"TRANSACTIONS-CSV-FILE" []));
+        v (info "of-json")
+          Term.(
+            const of_json
+            $ Arg.(required & pos 0 (some string) None & info ~docv:"FILE" []));
+        v (info "to-json")
+          Term.(
+            const to_json
+            $ Arg.(required & pos 0 (some string) None & info ~docv:"FILE" []));
         v (info "check")
           Term.(
             const check

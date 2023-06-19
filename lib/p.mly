@@ -1,7 +1,7 @@
 %{
 %}
 
-%token BR EOF INDENT DEDENT MINUS STAR K_IMPORT_CSV K_OPEN_ACCOUNT
+%token BR EOF INDENT DEDENT MINUS STAR K_IMPORT K_OPEN_ACCOUNT
 
 %token <int> SPACE
 %token <int> INT_LIT
@@ -32,21 +32,20 @@ Date :
 
 Directive :
 (* !open-account *)
-| K_OPEN_ACCOUNT date=Date account=Account currency=ID {
+| K_OPEN_ACCOUNT account=Account currency=ID {
   Model.OpenAccount {
-    date;
     account;
     currency;
   }
 }
-| K_IMPORT_CSV filename=STRING_LIT {
-  Model.ImportCSV {
+| K_IMPORT filename=STRING_LIT {
+  Model.Import {
     filename;
     transactions = [];
   }
 }
-| K_IMPORT_CSV filename=STRING_LIT INDENT transactions=Transactions DEDENT {
-  Model.ImportCSV {
+| K_IMPORT filename=STRING_LIT INDENT transactions=Transactions DEDENT {
+  Model.Import {
     filename;
     transactions;
   }
@@ -66,7 +65,7 @@ Transactions :
 
 Transaction :
 | STAR date=Date narration=STRING_LIT INDENT postings=separated_list(BR, Posting) DEDENT {
-  Model.make_transaction ~date ~flag:"*" ~narration ~postings ()
+  Model.make_transaction ~date ~narration ~postings ()
 }
 
 Posting :

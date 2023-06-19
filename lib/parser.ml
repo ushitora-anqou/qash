@@ -7,7 +7,7 @@ let string_of_token = function
   | P.ID s -> "ID " ^ s
   | P.INDENT -> "INDENT"
   | P.INT_LIT i -> "INT_LIT " ^ string_of_int i
-  | P.K_IMPORT_CSV -> "!import-csv"
+  | P.K_IMPORT -> "!import"
   | P.K_OPEN_ACCOUNT -> "!open-account"
   | P.MINUS -> "MINUS"
   | P.SPACE n -> "SPACE " ^ string_of_int n
