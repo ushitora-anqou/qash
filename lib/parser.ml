@@ -69,6 +69,11 @@ module Lexer = struct
             x
         | [] -> assert false)
 
+  let clear () =
+    current_indent := 0;
+    queued_src_token := [];
+    cached_tokens := []
+
   let main width lex = cache (main' width lex)
 end
 
@@ -78,6 +83,7 @@ let do_parse lex =
     errf ("%s:%d:%d: " ^^ fmt) pos.pos_fname pos.pos_lnum
       (pos.pos_cnum - pos.pos_bol)
   in
+  Lexer.clear ();
   try Ok (P.toplevel (Lexer.main 2) lex) with
   | L.Error s -> errf_with_pos "%s" s
   | P.Error -> errf_with_pos "syntax error"

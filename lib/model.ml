@@ -38,6 +38,7 @@ type directive =
 [@@deriving yojson]
 
 type directives = directive list [@@deriving yojson]
+type t = { accounts : open_account list; transactions : transactions }
 
 let is_date_earlier date ~than =
   let { year; month; day } = date in
@@ -84,3 +85,8 @@ let string_of_directives ds =
   let ppf = Format.formatter_of_buffer buf in
   Format.fprintf ppf "@[<v 0>%a@]@?" (Format.pp_print_list pp_directive) ds;
   Buffer.contents buf |> String.trim
+
+let to_string (t : t) =
+  (t.accounts |> List.map (fun a -> OpenAccount a))
+  @ (t.transactions |> List.map (fun t -> Transaction t))
+  |> string_of_directives

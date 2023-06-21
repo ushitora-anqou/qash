@@ -89,7 +89,9 @@ let of_gnucash_csv transactions_csv_filename =
   |> Model.string_of_directives |> print_endline
 
 let check filename =
-  match Parser.parse_file filename with Ok _ -> () | Error s -> failwith s
+  let m = Loader.load_file filename in
+  Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
+    (List.length m.transactions)
 
 let () =
   let open Cmdliner in
