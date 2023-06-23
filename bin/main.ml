@@ -93,6 +93,13 @@ let check filename =
   Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
     (List.length m.transactions)
 
+let dump in_filename out_filename =
+  let m = Loader.load_file in_filename in
+  Sql_writer.dump
+    ("sqlite3://" ^ Filename.concat (Sys.getcwd ()) out_filename)
+    m
+  |> Lwt_main.run
+
 let () =
   let open Cmdliner in
   Cmd.(
@@ -118,6 +125,13 @@ let () =
           Term.(
             const check
             $ Arg.(required & pos 0 (some string) None & info ~docv:"FILE" []));
+        v (info "dump")
+          Term.(
+            const dump
+            $ Arg.(
+                required & pos 0 (some string) None & info ~docv:"IN-FILE" [])
+            $ Arg.(
+                required & pos 1 (some string) None & info ~docv:"OUT-FILE" []));
       ]
     |> eval)
   |> exit
