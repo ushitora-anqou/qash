@@ -100,6 +100,10 @@ let dump in_filename out_filename =
     m
   |> Lwt_main.run
 
+let dump_memory in_filename =
+  let m = Loader.load_file in_filename in
+  Sql_writer.dump "sqlite3::memory:" m |> Lwt_main.run
+
 let () =
   let open Cmdliner in
   Cmd.(
@@ -125,6 +129,11 @@ let () =
           Term.(
             const check
             $ Arg.(required & pos 0 (some string) None & info ~docv:"FILE" []));
+        v (info "dump-memory")
+          Term.(
+            const dump_memory
+            $ Arg.(
+                required & pos 0 (some string) None & info ~docv:"IN-FILE" []));
         v (info "dump")
           Term.(
             const dump
