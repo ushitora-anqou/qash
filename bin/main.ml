@@ -104,12 +104,7 @@ let dump in_filename out_filename =
   in
   Lwt.return_unit
 
-let serve in_filename =
-  let m = Loader.load_file in_filename in
-  Lwt_main.run
-  @@
-  let%lwt _con = Sql_writer.dump "sqlite3::memory:" m in
-  Lwt.return_unit
+let serve in_filename = Lwt_main.run (Html_server.serve in_filename)
 
 let () =
   let open Cmdliner in

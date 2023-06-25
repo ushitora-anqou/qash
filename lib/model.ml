@@ -18,6 +18,7 @@ type posting = {
   cost : cost option; [@yojson.option]
   price : price option; [@yojson.option]
   narration : string; [@default ""] [@yojson_drop_default ( = )]
+  balance : int; [@default 0]
 }
 [@@deriving make, yojson]
 
@@ -90,3 +91,6 @@ let to_string (t : t) =
   (t.accounts |> List.map (fun a -> OpenAccount a))
   @ (t.transactions |> List.map (fun t -> Transaction t))
   |> string_of_directives
+
+let date_of_string s =
+  Scanf.sscanf s "%d-%d-%d" (fun year month day -> make_date ~year ~month ~day)
