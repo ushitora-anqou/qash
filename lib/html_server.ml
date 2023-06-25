@@ -27,6 +27,9 @@ INNER JOIN accounts a ON p.account_id = a.id
 INNER JOIN transactions t ON p.transaction_id = t.id
 ORDER BY t.created_at, t.id, p.id
 |}
+
+    let select_accounts =
+      (unit ->* string) {|SELECT name FROM accounts ORDER BY name|}
   end
 
   let decode_transactions fold arg =
@@ -61,6 +64,11 @@ ORDER BY t.created_at, t.id, p.id
 
   let select_account_transactions (module Db : Caqti_lwt.CONNECTION) account =
     decode_transactions (Db.fold Q.select_account_transactions) account
+
+  let select_accounts (module Db : Caqti_lwt.CONNECTION) =
+    match%lwt Db.fold Q.select_accounts List.cons () [] with
+    | Error _ -> failwith "failed to decode accounts from db"
+    | Ok l -> Lwt.return l
 end
 
 let jingoo_model_of_transactions rows =
@@ -105,44 +113,48 @@ let serve in_filename =
   let%lwt model_gl =
     Store.select_transactions con >|= jingoo_model_of_transactions
   in
-  let%lwt model_account_food =
-    Store.select_account_transactions con "費用:食費"
-    >|= jingoo_model_of_transactions
+
+  let%lwt accounts = Store.select_accounts con in
+  let%lwt model_accounts =
+    Lwt_list.map_s
+      (fun account ->
+        Store.select_account_transactions con account
+        >|= jingoo_model_of_transactions
+        >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
+      accounts
   in
   let models =
-    Jingoo.Jg_types.
-      [
-        ("gl", Tlist model_gl);
-        ("account", Tobj [ ("費用:食費", Tlist model_account_food) ]);
-      ]
+    Jingoo.Jg_types.[ ("gl", Tlist model_gl); ("account", Tobj model_accounts) ]
   in
   Jingoo.Jg_template.from_string ~models
     {|
 {%- macro transaction_table (rows) -%}
-<table>
+<details>
+<table class="transactions">
 <thead>
-<tr><td>日付</td><td>説明</td><td>勘定科目</td><td>借方</td><td>貸方</td><td>貸借残高</td></tr>
+<tr><td class="col-date">日付</td><td class="col-narration">説明</td><td class="col-account">勘定科目</td><td class="col-debit">借方</td><td class="col-credit">貸方</td><td class="col-balance">貸借残高</td></tr>
 </thead>
 <tbody>
 {%- for tx in rows -%}
 {%- for p in tx.postings -%}
 <tr>
 {%- if loop.first -%}
-<td>{{ tx.date }}</td><td>{{ tx.narration }}</td>
+<td class="col-date">{{ tx.date }}</td><td class="col-narration">{{ tx.narration }}</td>
 {%- else -%}
-<td></td><td></td>
+<td class="col-date"></td><td class="col-narration"></td>
 {%- endif -%}
 {%- if p.amount < 0 -%}
-<td>{{ p.account }}</td><td></td><td class="number">{{ p.abs_amount_s }}</td>
+<td class="col-account">{{ p.account }}</td><td class="col-debit"></td><td class="col-credit">{{ p.abs_amount_s }}</td>
 {%- else -%}
-<td>{{ p.account }}</td><td class="number">{{ p.abs_amount_s }}</td><td></td>
+<td class="col-account">{{ p.account }}</td><td class="col-debit">{{ p.abs_amount_s }}</td><td class="col-credit"></td>
 {%- endif -%}
-<td class="number">{{ p.balance_s }}</td>
+<td class="col-balance">{{ p.balance_s }}</td>
 </tr>
 {%- endfor -%}
 {% endfor -%}
 </tbody>
 </table>
+</details>
 {%- endmacro -%}
 
 <!DOCTYPE html>
@@ -150,21 +162,49 @@ let serve in_filename =
 <head>
 <meta charset="utf-8">
 <style>
-td.number {
+* {
+  max-width: 95%;
+  margin: 20px auto;
+}
+table.transactions .col-date {
+  width: 10vw;
+}
+table.transactions .col-narration {
+  width: 50vw;
+}
+table.transactions .col-account {
+  width: 10vw;
+  text-align: right;
+  white-space: nowrap;
+  overflow: auto;
+}
+table.transactions .col-debit {
+  width: 10vw;
   text-align: right;
 }
-thead tr, thead td {
+table.transactions .col-credit {
+  width: 10vw;
+  text-align: right;
+}
+table.transactions .col-balance {
+  width: 10vw;
+  text-align: right;
+}
+table.transactions td.number {
+  text-align: right;
+}
+table.transactions thead tr, table.transactions thead td {
   background-color: #96b183;
   border: 2px solid black;
   font-weight: bold;
 }
-tbody tr:nth-child(even) {
+table.transactions tbody tr:nth-child(even) {
   background-color: #f6ffda;
 }
-tbody tr:nth-child(odd) {
+table.transactions tbody tr:nth-child(odd) {
   background-color: #bfdeb9;
 }
-table, th, td {
+table.transactions, table.transactions th, table.transactions td {
   border: 1px solid black;
   border-collapse: collapse;
   padding: 5px;
@@ -174,7 +214,15 @@ table, th, td {
 <title>Qash</title>
 </head>
 <body>
-{{ transaction_table (account["費用:食費"]) }}
+<h1>Qash</h1>
+{%- for account, rows in account -%}
+<a href="#{{ account }}">{{ account }}</a>
+{% endfor -%}
+{%- for account, rows in account -%}
+<h2 id="{{ account }}">{{ account }}</h2>
+{{ transaction_table (rows) }}
+{% endfor -%}
+<h2>総勘定元帳</h2>
 {{ transaction_table (gl) }}
 </body>
 </html>
