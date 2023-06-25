@@ -112,4 +112,4 @@ let dump uri (model : Model.t) =
         Store.insert_posting con ~account_id ~transaction_id:tx_id
           ~amount:p.amount ~narration:p.narration);%lwt
 
-  Lwt.return_unit
+  Lwt.return con

@@ -95,14 +95,21 @@ let check filename =
 
 let dump in_filename out_filename =
   let m = Loader.load_file in_filename in
-  Sql_writer.dump
-    ("sqlite3://" ^ Filename.concat (Sys.getcwd ()) out_filename)
-    m
-  |> Lwt_main.run
+  Lwt_main.run
+  @@
+  let%lwt _ =
+    Sql_writer.dump
+      ("sqlite3://" ^ Filename.concat (Sys.getcwd ()) out_filename)
+      m
+  in
+  Lwt.return_unit
 
-let dump_memory in_filename =
+let serve in_filename =
   let m = Loader.load_file in_filename in
-  Sql_writer.dump "sqlite3::memory:" m |> Lwt_main.run
+  Lwt_main.run
+  @@
+  let%lwt _con = Sql_writer.dump "sqlite3::memory:" m in
+  Lwt.return_unit
 
 let () =
   let open Cmdliner in
@@ -129,9 +136,9 @@ let () =
           Term.(
             const check
             $ Arg.(required & pos 0 (some string) None & info ~docv:"FILE" []));
-        v (info "dump-memory")
+        v (info "serve")
           Term.(
-            const dump_memory
+            const serve
             $ Arg.(
                 required & pos 0 (some string) None & info ~docv:"IN-FILE" []));
         v (info "dump")

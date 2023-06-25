@@ -1,4 +1,6 @@
 (executable
  (public_name qash)
  (name main)
+ (preprocess
+  (pps lwt_ppx))
  (libraries qash cmdliner yojson))
