@@ -16,7 +16,10 @@ module Store = struct
 CREATE TABLE accounts (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
-  currency TEXT NOT NULL
+  currency TEXT NOT NULL,
+  parent_id INTEGER,
+
+  UNIQUE (name, currency, parent_id)
 )|}
 
     let create_transactions =
@@ -43,9 +46,21 @@ CREATE TABLE postings (
   FOREIGN KEY (transaction_id) REFERENCES transactions (id)
 )|}
 
+    let create_full_accounts_view =
+      (unit ->. unit)
+        {|
+CREATE VIEW full_accounts AS
+WITH RECURSIVE tree(id, name, currency, parent_id, depth) AS (
+  SELECT id, name, currency, parent_id, 0 FROM accounts WHERE parent_id IS NULL
+  UNION ALL
+  SELECT a.id, t.name || ':' || a.name, a.currency, a.parent_id, t.depth + 1 FROM accounts a JOIN tree t ON a.parent_id = t.id
+)
+SELECT id, name, currency, depth FROM tree
+|}
+
     let insert_account =
-      (tup2 string string ->. unit)
-        {|INSERT INTO accounts (name, currency) VALUES (?, ?)|}
+      (tup3 string string (option int) ->! int)
+        {|INSERT INTO accounts (name, currency, parent_id) VALUES (?, ?, ?) RETURNING id|}
 
     let insert_transaction =
       (tup2 string string ->! int)
@@ -56,7 +71,11 @@ CREATE TABLE postings (
         {|INSERT INTO postings (account_id, transaction_id, amount, narration) VALUES (?, ?, ?, ?)|}
 
     let select_account =
-      (string ->! int) {|SELECT id FROM accounts WHERE name = ?|}
+      (tup3 string string (option int) ->? int)
+        {|SELECT id FROM accounts WHERE name = ? AND currency = ? AND parent_id IS ?|}
+
+    let select_account_by_fullname =
+      (string ->! int) {|SELECT id FROM full_accounts WHERE name = ?|}
   end
 
   let raise_if_error f =
@@ -73,8 +92,24 @@ CREATE TABLE postings (
   let create_postings (module Db : Caqti_lwt.CONNECTION) =
     Db.exec Q.create_postings () |> raise_if_error
 
-  let insert_account (module Db : Caqti_lwt.CONNECTION) ~name ~currency =
-    Db.exec Q.insert_account (name, currency) |> raise_if_error
+  let create_full_accounts_view (module Db : Caqti_lwt.CONNECTION) =
+    Db.exec Q.create_full_accounts_view () |> raise_if_error
+
+  let insert_account (module Db : Caqti_lwt.CONNECTION) ~account ~currency =
+    let parent_id = ref None in
+    account
+    |> Lwt_list.iter_s @@ fun name ->
+       let%lwt id =
+         match%lwt
+           Db.find_opt Q.select_account (name, currency, !parent_id)
+           |> raise_if_error
+         with
+         | Some id -> Lwt.return id
+         | None ->
+             Db.find Q.insert_account (name, currency, !parent_id)
+             |> raise_if_error
+       in
+       Lwt.return (parent_id := Some id)
 
   let insert_transaction (module Db : Caqti_lwt.CONNECTION) ~date ~narration =
     Db.find Q.insert_transaction (string_of_date date, narration)
@@ -85,8 +120,9 @@ CREATE TABLE postings (
     Db.exec Q.insert_posting (account_id, transaction_id, amount, narration)
     |> raise_if_error
 
-  let select_account (module Db : Caqti_lwt.CONNECTION) account =
-    Db.find Q.select_account (string_of_account account) |> raise_if_error
+  let select_account_by_fullname (module Db : Caqti_lwt.CONNECTION) account =
+    Db.find Q.select_account_by_fullname (string_of_account account)
+    |> raise_if_error
 end
 
 let dump uri (model : Model.t) =
@@ -97,9 +133,9 @@ let dump uri (model : Model.t) =
 
   (model.accounts
   |> Lwt_list.iter_s @@ fun (acc : Model.open_account) ->
-     Store.insert_account con
-       ~name:(acc.account |> String.concat ":")
-       ~currency:acc.currency);%lwt
+     Store.insert_account con ~account:acc.account ~currency:acc.currency);%lwt
+
+  Store.create_full_accounts_view con;%lwt
 
   (model.transactions
   |> Lwt_list.iter_s @@ fun (tx : Model.transaction) ->
@@ -108,7 +144,7 @@ let dump uri (model : Model.t) =
      in
      tx.postings
      |> Lwt_list.iter_s @@ fun (p : Model.posting) ->
-        let%lwt account_id = Store.select_account con p.account in
+        let%lwt account_id = Store.select_account_by_fullname con p.account in
         Store.insert_posting con ~account_id ~transaction_id:tx_id
           ~amount:p.amount ~narration:p.narration);%lwt
 

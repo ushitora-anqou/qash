@@ -7,3 +7,5 @@ let with_file path f =
   else
     let ic = open_in_bin path in
     Fun.protect ~finally:(fun () -> close_in ic) (fun () -> f ic)
+
+let ignore_lwt f = Lwt.map (fun _ -> ()) f

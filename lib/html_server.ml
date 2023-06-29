@@ -1,4 +1,5 @@
 open Lwt.Infix
+open Util
 
 module Store = struct
   module Q = struct
@@ -11,7 +12,7 @@ module Store = struct
 SELECT t.id, t.created_at, t.narration, p.narration, a.name, p.amount,
        sum(p.amount) OVER (ORDER BY t.created_at, t.id, p.id)
 FROM postings p
-INNER JOIN accounts a ON p.account_id = a.id
+INNER JOIN full_accounts a ON p.account_id = a.id
 INNER JOIN transactions t ON p.transaction_id = t.id
 WHERE a.name = ?
 ORDER BY t.created_at, t.id, p.id
@@ -23,14 +24,47 @@ ORDER BY t.created_at, t.id, p.id
 SELECT t.id, t.created_at, t.narration, p.narration, a.name, p.amount,
        sum(p.amount) OVER (ORDER BY t.created_at, t.id, p.id)
 FROM postings p
-INNER JOIN accounts a ON p.account_id = a.id
+INNER JOIN full_accounts a ON p.account_id = a.id
 INNER JOIN transactions t ON p.transaction_id = t.id
 ORDER BY t.created_at, t.id, p.id
 |}
 
     let select_accounts =
-      (unit ->* string) {|SELECT name FROM accounts ORDER BY name|}
+      (unit ->* string) {|SELECT name FROM full_accounts ORDER BY name|}
+
+    let select_accounts_by_depth_name =
+      (tup2 int string ->* string)
+        {|
+SELECT name FROM full_accounts
+WHERE depth = ? AND name LIKE ?
+ORDER BY name
+|}
+
+    let select_sum_amount_by_depth_account_year =
+      (tup3 int string string ->* tup3 string string int)
+        {|
+WITH RECURSIVE temp(id, name, parent_id, depth, target) AS (
+  SELECT id, name, parent_id, 0, NULL FROM accounts WHERE parent_id IS NULL
+  UNION ALL
+  SELECT a.id, t.name || ':' || a.name, a.parent_id, t.depth + 1,
+         CASE WHEN t.depth = ? THEN t.name ELSE t.target END
+  FROM accounts a JOIN temp t ON a.parent_id = t.id
+)
+SELECT strftime("%Y-%m", t.created_at) AS ym,
+       COALESCE(temp.target, temp.name) AS key_name, sum(p.amount)
+FROM postings p
+INNER JOIN temp ON p.account_id = temp.id
+INNER JOIN transactions t ON p.transaction_id = t.id
+WHERE key_name LIKE ? AND strftime('%Y', t.created_at) = ?
+GROUP BY key_name, ym
+ORDER BY key_name, ym
+|}
   end
+
+  let raise_if_error f =
+    match%lwt f with
+    | Ok x -> Lwt.return x
+    | Error e -> failwith (Caqti_error.show e)
 
   let decode_transactions fold arg =
     let aux
@@ -66,8 +100,20 @@ ORDER BY t.created_at, t.id, p.id
     decode_transactions (Db.fold Q.select_account_transactions) account
 
   let select_accounts (module Db : Caqti_lwt.CONNECTION) =
-    match%lwt Db.fold Q.select_accounts List.cons () [] with
-    | Error _ -> failwith "failed to decode accounts from db"
+    Db.fold Q.select_accounts List.cons () [] |> raise_if_error
+
+  let select_accounts_by_depth_name (module Db : Caqti_lwt.CONNECTION) ~depth
+      ~name =
+    Db.fold Q.select_accounts_by_depth_name List.cons (depth, name) []
+    |> raise_if_error
+
+  let select_sum_amount_by_depth_account_year (module Db : Caqti_lwt.CONNECTION)
+      ~depth ~account ~year =
+    match%lwt
+      Db.fold Q.select_sum_amount_by_depth_account_year List.cons
+        (depth, account, year) []
+    with
+    | Error _ -> failwith "failed to decode expense from db"
     | Ok l -> Lwt.return l
 end
 
@@ -123,111 +169,51 @@ let serve in_filename =
         >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
       accounts
   in
-  let models =
-    Jingoo.Jg_types.[ ("gl", Tlist model_gl); ("account", Tobj model_accounts) ]
-  in
-  Jingoo.Jg_template.from_string ~models
-    {|
-{%- macro transaction_table (rows) -%}
-<details>
-<table class="transactions">
-<thead>
-<tr><td class="col-date">日付</td><td class="col-narration">説明</td><td class="col-account">勘定科目</td><td class="col-debit">借方</td><td class="col-credit">貸方</td><td class="col-balance">貸借残高</td></tr>
-</thead>
-<tbody>
-{%- for tx in rows -%}
-{%- for p in tx.postings -%}
-<tr>
-{%- if loop.first -%}
-<td class="col-date">{{ tx.date }}</td><td class="col-narration">{{ tx.narration }}</td>
-{%- else -%}
-<td class="col-date"></td><td class="col-narration"></td>
-{%- endif -%}
-{%- if p.amount < 0 -%}
-<td class="col-account">{{ p.account }}</td><td class="col-debit"></td><td class="col-credit">{{ p.abs_amount_s }}</td>
-{%- else -%}
-<td class="col-account">{{ p.account }}</td><td class="col-debit">{{ p.abs_amount_s }}</td><td class="col-credit"></td>
-{%- endif -%}
-<td class="col-balance">{{ p.balance_s }}</td>
-</tr>
-{%- endfor -%}
-{% endfor -%}
-</tbody>
-</table>
-</details>
-{%- endmacro -%}
 
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<style>
-* {
-  max-width: 95%;
-  margin: 20px auto;
-}
-table.transactions .col-date {
-  width: 10vw;
-}
-table.transactions .col-narration {
-  width: 50vw;
-}
-table.transactions .col-account {
-  width: 10vw;
-  text-align: right;
-  white-space: nowrap;
-  overflow: auto;
-}
-table.transactions .col-debit {
-  width: 10vw;
-  text-align: right;
-}
-table.transactions .col-credit {
-  width: 10vw;
-  text-align: right;
-}
-table.transactions .col-balance {
-  width: 10vw;
-  text-align: right;
-}
-table.transactions td.number {
-  text-align: right;
-}
-table.transactions thead tr, table.transactions thead td {
-  background-color: #96b183;
-  border: 2px solid black;
-  font-weight: bold;
-}
-table.transactions tbody tr:nth-child(even) {
-  background-color: #f6ffda;
-}
-table.transactions tbody tr:nth-child(odd) {
-  background-color: #bfdeb9;
-}
-table.transactions, table.transactions th, table.transactions td {
-  border: 1px solid black;
-  border-collapse: collapse;
-  padding: 5px;
-  color: #000000;
-}
-</style>
-<title>Qash</title>
-</head>
-<body>
-<h1>Qash</h1>
-{%- for account, rows in account -%}
-<a href="#{{ account }}">{{ account }}</a>
-{% endfor -%}
-{%- for account, rows in account -%}
-<h2 id="{{ account }}">{{ account }}</h2>
-{{ transaction_table (rows) }}
-{% endfor -%}
-<h2>総勘定元帳</h2>
-{{ transaction_table (gl) }}
-</body>
-</html>
-|}
-  |> print_string;
+  let%lwt expense =
+    Store.select_sum_amount_by_depth_account_year con ~depth:1 ~account:"費用:%"
+      ~year:"2023"
+  in
+  let%lwt accounts_depth_1 =
+    Store.select_accounts_by_depth_name con ~depth:1 ~name:"費用:%"
+  in
+  let model_expense =
+    let labels =
+      [ "2023-01"; "2023-02"; "2023-03"; "2023-04"; "2023-05"; "2023-06" ]
+    in
+    let data = Hashtbl.create 0 in
+    List.iter
+      (fun (ym, account, amount) -> Hashtbl.add data (account, ym) amount)
+      expense;
+    Jingoo.Jg_types.
+      [
+        ("labels", Tlist (labels |> List.map (fun s -> Tstr s)));
+        ( "data",
+          Tobj
+            (accounts_depth_1
+            |> List.map (fun account ->
+                   ( account,
+                     Tlist
+                       (labels
+                       |> List.map (fun label ->
+                              Tint
+                                (Hashtbl.find_opt data (account, label)
+                                |> Option.value ~default:0))) ))) );
+      ]
+  in
+
+  let models =
+    Jingoo.Jg_types.
+      [
+        ("gl", Tlist model_gl);
+        ("account", Tobj model_accounts);
+        ("expense", Tobj model_expense);
+      ]
+  in
+  with_file "lib/index.html.tpl" (fun f ->
+      f |> In_channel.input_all
+      |> Jingoo.Jg_template.from_string ~models
+      |> print_string);
   print_newline ();
 
   Lwt.return_unit
