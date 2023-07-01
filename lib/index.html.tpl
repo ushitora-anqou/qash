@@ -2,9 +2,7 @@
 <div>
 <canvas id="{{ canvas_id }}" width="800" height="800"></canvas>
 <script>
-const colors = ['#4E79A7', '#A0CBE8', '#F28E2B', '#FFBE7D', '#59A14F', '#8CD17D', '#B6992D', '#F1CE63', '#499894', '#86BCB6', '#E15759', '#FF9D9A', '#79706E', '#BAB0AC', '#D37295', '#FABFD2', '#B07AA1', '#D4A6C8', '#9D7660', '#D7B5A6']
-const ctx = document.getElementById('{{ canvas_id }}');
-new Chart(ctx, {
+new Chart(document.getElementById('{{ canvas_id }}'), {
   type: 'bar',
   data: {
     labels: [
@@ -123,17 +121,24 @@ table.transactions, table.transactions th, table.transactions td {
 </style>
 <title>Qash</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const colors = ['#4E79A7', '#A0CBE8', '#F28E2B', '#FFBE7D', '#59A14F', '#8CD17D', '#B6992D', '#F1CE63', '#499894', '#86BCB6', '#E15759', '#FF9D9A', '#79706E', '#BAB0AC', '#D37295', '#FABFD2', '#B07AA1', '#D4A6C8', '#9D7660', '#D7B5A6']
+</script>
 </head>
 <body>
 <h1>Qash</h1>
 {%- for account, rows in account -%}
 <a href="#{{ account }}">{{ account }}</a>
 {% endfor -%}
+<h2>収益チャート</h2>
+{{ bars_table ("income-2023", income) }}
 <h2>費用チャート</h2>
 {{ bars_table ("expense-2023", expense) }}
 {%- for account, rows in account -%}
+{%- if length(rows) != 0 -%}
 <h2 id="{{ account }}">{{ account }}</h2>
 {{ transaction_table (rows) }}
+{%- endif -%}
 {% endfor -%}
 <h2>総勘定元帳</h2>
 {{ transaction_table (gl) }}

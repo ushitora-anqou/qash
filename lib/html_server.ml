@@ -170,44 +170,52 @@ let serve in_filename =
       accounts
   in
 
-  let%lwt expense =
-    Store.select_sum_amount_by_depth_account_year con ~depth:1 ~account:"費用:%"
-      ~year:"2023"
-  in
-  let%lwt accounts_depth_1 =
-    Store.select_accounts_by_depth_name con ~depth:1 ~name:"費用:%"
-  in
-  let model_expense =
+  let get_flow_model name depth year is_debt =
+    let like_query = name ^ ":%" in
+    let%lwt raw_data =
+      Store.select_sum_amount_by_depth_account_year con ~depth
+        ~account:like_query ~year
+    in
+    let%lwt accounts_depth_1 =
+      Store.select_accounts_by_depth_name con ~depth ~name:like_query
+    in
     let labels =
-      [ "2023-01"; "2023-02"; "2023-03"; "2023-04"; "2023-05"; "2023-06" ]
+      iota 12 |> List.map (fun i -> Printf.sprintf "%s-%02d" year (i + 1))
     in
     let data = Hashtbl.create 0 in
     List.iter
-      (fun (ym, account, amount) -> Hashtbl.add data (account, ym) amount)
-      expense;
-    Jingoo.Jg_types.
-      [
-        ("labels", Tlist (labels |> List.map (fun s -> Tstr s)));
-        ( "data",
-          Tobj
-            (accounts_depth_1
-            |> List.map (fun account ->
-                   ( account,
-                     Tlist
-                       (labels
-                       |> List.map (fun label ->
-                              Tint
-                                (Hashtbl.find_opt data (account, label)
-                                |> Option.value ~default:0))) ))) );
-      ]
+      (fun (ym, account, amount) ->
+        Hashtbl.add data (account, ym) (if is_debt then amount else -amount))
+      raw_data;
+    Lwt.return
+      Jingoo.Jg_types.(
+        Tobj
+          [
+            ("labels", Tlist (labels |> List.map (fun s -> Tstr s)));
+            ( "data",
+              Tobj
+                (accounts_depth_1
+                |> List.map (fun account ->
+                       ( account,
+                         Tlist
+                           (labels
+                           |> List.map (fun label ->
+                                  Tint
+                                    (Hashtbl.find_opt data (account, label)
+                                    |> Option.value ~default:0))) ))) );
+          ])
   in
+
+  let%lwt model_expense = get_flow_model "費用" 1 "2023" true in
+  let%lwt model_income = get_flow_model "収益" 1 "2023" false in
 
   let models =
     Jingoo.Jg_types.
       [
         ("gl", Tlist model_gl);
         ("account", Tobj model_accounts);
-        ("expense", Tobj model_expense);
+        ("expense", model_expense);
+        ("income", model_income);
       ]
   in
   with_file "lib/index.html.tpl" (fun f ->
