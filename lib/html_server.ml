@@ -40,6 +40,34 @@ WHERE depth = ? AND name LIKE ?
 ORDER BY name
 |}
 
+    let select_cumulative_sum_amount_by_depth_account_year =
+      (tup3 int string string ->* tup3 string string int)
+        {|
+WITH RECURSIVE temp(id, name, parent_id, depth, target) AS (
+  SELECT id, name, parent_id, 0, NULL FROM accounts WHERE parent_id IS NULL
+  UNION ALL
+  SELECT a.id, t.name || ':' || a.name, a.parent_id, t.depth + 1,
+         CASE WHEN t.depth = ? THEN t.name ELSE t.target END
+  FROM accounts a JOIN temp t ON a.parent_id = t.id
+)
+SELECT ym, key_name, sum_amount
+FROM (
+  SELECT DISTINCT
+    ym, key_name,
+    SUM(amount) OVER (PARTITION BY key_name ORDER BY ym) AS sum_amount,
+    year
+  FROM (
+    SELECT strftime("%Y-%m", t.created_at) AS ym,
+           COALESCE(temp.target, temp.name) AS key_name,
+           p.amount AS amount,
+           strftime('%Y', t.created_at) AS year
+    FROM postings p
+    INNER JOIN temp ON p.account_id = temp.id
+    INNER JOIN transactions t ON p.transaction_id = t.id))
+WHERE key_name LIKE ? AND year = ?
+ORDER BY key_name, ym
+|}
+
     let select_sum_amount_by_depth_account_year =
       (tup3 int string string ->* tup3 string string int)
         {|
@@ -107,14 +135,17 @@ ORDER BY key_name, ym
     Db.fold Q.select_accounts_by_depth_name List.cons (depth, name) []
     |> raise_if_error
 
+  let select_cumulative_sum_amount_by_depth_account_year
+      (module Db : Caqti_lwt.CONNECTION) ~depth ~account ~year =
+    Db.fold Q.select_cumulative_sum_amount_by_depth_account_year List.cons
+      (depth, account, year) []
+    |> raise_if_error
+
   let select_sum_amount_by_depth_account_year (module Db : Caqti_lwt.CONNECTION)
       ~depth ~account ~year =
-    match%lwt
-      Db.fold Q.select_sum_amount_by_depth_account_year List.cons
-        (depth, account, year) []
-    with
-    | Error _ -> failwith "failed to decode expense from db"
-    | Ok l -> Lwt.return l
+    Db.fold Q.select_sum_amount_by_depth_account_year List.cons
+      (depth, account, year) []
+    |> raise_if_error
 end
 
 let jingoo_model_of_transactions rows =
@@ -170,13 +201,18 @@ let serve in_filename =
       accounts
   in
 
-  let get_flow_model name depth year is_debt =
+  let get_model ~name ~depth ~year kind column =
     let like_query = name ^ ":%" in
     let%lwt raw_data =
-      Store.select_sum_amount_by_depth_account_year con ~depth
-        ~account:like_query ~year
+      match kind with
+      | `Stock ->
+          Store.select_cumulative_sum_amount_by_depth_account_year con ~depth
+            ~account:like_query ~year
+      | `Flow ->
+          Store.select_sum_amount_by_depth_account_year con ~depth
+            ~account:like_query ~year
     in
-    let%lwt accounts_depth_1 =
+    let%lwt accounts_depth =
       Store.select_accounts_by_depth_name con ~depth ~name:like_query
     in
     let labels =
@@ -185,7 +221,8 @@ let serve in_filename =
     let data = Hashtbl.create 0 in
     List.iter
       (fun (ym, account, amount) ->
-        Hashtbl.add data (account, ym) (if is_debt then amount else -amount))
+        Hashtbl.add data (account, ym)
+          (match column with `Debt -> amount | `Credit -> -amount))
       raw_data;
     Lwt.return
       Jingoo.Jg_types.(
@@ -194,7 +231,7 @@ let serve in_filename =
             ("labels", Tlist (labels |> List.map (fun s -> Tstr s)));
             ( "data",
               Tobj
-                (accounts_depth_1
+                (accounts_depth
                 |> List.map (fun account ->
                        ( account,
                          Tlist
@@ -206,14 +243,26 @@ let serve in_filename =
           ])
   in
 
-  let%lwt model_expense = get_flow_model "費用" 1 "2023" true in
-  let%lwt model_income = get_flow_model "収益" 1 "2023" false in
+  let%lwt model_asset =
+    get_model ~name:"資産" ~depth:1 ~year:"2023" `Stock `Debt
+  in
+  let%lwt model_liability =
+    get_model ~name:"負債" ~depth:1 ~year:"2023" `Stock `Credit
+  in
+  let%lwt model_expense =
+    get_model ~name:"費用" ~depth:1 ~year:"2023" `Flow `Debt
+  in
+  let%lwt model_income =
+    get_model ~name:"収益" ~depth:1 ~year:"2023" `Flow `Credit
+  in
 
   let models =
     Jingoo.Jg_types.
       [
         ("gl", Tlist model_gl);
         ("account", Tobj model_accounts);
+        ("asset", model_asset);
+        ("liability", model_liability);
         ("expense", model_expense);
         ("income", model_income);
       ]

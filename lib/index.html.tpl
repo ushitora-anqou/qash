@@ -130,6 +130,10 @@ const colors = ['#4E79A7', '#A0CBE8', '#F28E2B', '#FFBE7D', '#59A14F', '#8CD17D'
 {%- for account, rows in account -%}
 <a href="#{{ account }}">{{ account }}</a>
 {% endfor -%}
+<h2>資産チャート</h2>
+{{ bars_table ("asset-2023", asset) }}
+<h2>負債チャート</h2>
+{{ bars_table ("liability-2023", liability) }}
 <h2>収益チャート</h2>
 {{ bars_table ("income-2023", income) }}
 <h2>費用チャート</h2>
