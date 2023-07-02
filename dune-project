@@ -21,6 +21,20 @@
  (description "A longer description")
  (tags
   (topics "to describe" your project))
- (depends ocaml dune menhir))
+ (depends
+  alcotest
+  caqti
+  caqti-driver-sqlite3
+  caqti-lwt
+  csv
+  dune
+  jingoo
+  lwt_ppx
+  menhir
+  ocaml
+  pcre
+  (ppx_yojson_conv
+   (<= v0.15.1))
+  yojson))
 
 (using menhir 2.1)

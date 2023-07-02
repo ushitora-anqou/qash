@@ -10,9 +10,19 @@ homepage: "https://github.com/username/reponame"
 doc: "https://url/to/documentation"
 bug-reports: "https://github.com/username/reponame/issues"
 depends: [
-  "ocaml"
+  "alcotest"
+  "caqti"
+  "caqti-driver-sqlite3"
+  "caqti-lwt"
+  "csv"
   "dune" {>= "3.8"}
+  "jingoo"
+  "lwt_ppx"
   "menhir"
+  "ocaml"
+  "pcre"
+  "ppx_yojson_conv" {<= "v0.15.1"}
+  "yojson"
   "odoc" {with-doc}
 ]
 build: [
