@@ -1,5 +1,6 @@
 open Qash
 open Util
+open Lwt.Infix
 
 let to_json filename =
   match Parser.parse_file filename with
@@ -90,8 +91,11 @@ let of_gnucash_csv transactions_csv_filename =
 
 let check filename =
   let m = Loader.load_file filename in
-  Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
-    (List.length m.transactions)
+  match Lwt_main.run (Sql_writer.dump_on_memory m >>= Verifier.verify) with
+  | Ok () ->
+      Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
+        (List.length m.transactions)
+  | Error e -> Printf.eprintf "Error: %s\n" e
 
 let dump in_filename out_filename =
   let m = Loader.load_file in_filename in

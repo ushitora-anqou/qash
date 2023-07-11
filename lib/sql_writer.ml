@@ -149,3 +149,5 @@ let dump uri (model : Model.t) =
           ~amount:p.amount ~narration:p.narration);%lwt
 
   Lwt.return con
+
+let dump_on_memory = dump "sqlite3::memory:"
