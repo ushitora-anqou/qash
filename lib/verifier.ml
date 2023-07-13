@@ -37,7 +37,27 @@ let verify_balanced_transactions con =
       |> Printf.sprintf "Unbalanced transactions:\n%s")
   else Ok ()
 
-let verify con =
+let verify_notes (module Db : Caqti_lwt.CONNECTION) notes =
+  notes
+  |> Lwt_list.fold_left_s
+       (fun res note ->
+         match res with
+         | Error _ -> Lwt.return res
+         | Ok () -> (
+             let open Caqti_request.Infix in
+             let open Caqti_type.Std in
+             let sql = match note with Loader.Assert s | Show s -> s in
+             match%lwt Db.find ((unit ->! string) sql) () with
+             | Error e -> Lwt.return_error (Caqti_error.show e)
+             | Ok s -> (
+                 match note with
+                 | Show _ | Assert _ ->
+                     Printf.printf "%s\n" s;
+                     Lwt.return_ok ())))
+       (Ok ())
+
+let verify con notes =
   let ( let* ) = Lwt_result.bind in
   let* () = verify_balanced_transactions con in
+  let* () = verify_notes con notes in
   Lwt_result.return ()

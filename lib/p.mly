@@ -1,7 +1,7 @@
 %{
 %}
 
-%token BR EOF INDENT DEDENT MINUS STAR K_IMPORT K_OPEN_ACCOUNT
+%token BR EOF INDENT DEDENT MINUS STAR K_IMPORT K_OPEN_ACCOUNT K_ASSERT K_SHOW
 
 %token <int> SPACE
 %token <int> INT_LIT
@@ -50,6 +50,12 @@ Directive :
     filename;
     transactions;
   }
+}
+| K_ASSERT sql=STRING_LIT {
+  Model.Assert sql
+}
+| K_SHOW sql=STRING_LIT {
+  Model.Show sql
 }
 (* Transaction *)
 | x=Transaction {

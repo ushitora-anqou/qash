@@ -42,6 +42,8 @@ type directive =
   | OpenAccount of open_account
   | Transaction of transaction
   | Import of { filename : string; transactions : transaction list }
+  | Assert of string
+  | Show of string
 [@@deriving yojson]
 
 type directives = directive list [@@deriving yojson]
@@ -86,6 +88,8 @@ let pp_directive ppf = function
       Format.fprintf ppf "@[<v 2>!import \"%s\"@,%a@]\n" filename
         (Format.pp_print_list pp_transaction)
         transactions
+  | Assert s -> Format.fprintf ppf "!assert %s\n" s
+  | Show s -> Format.fprintf ppf "!show %s\n" s
 
 let string_of_directives ds =
   let buf = Buffer.create 0 in

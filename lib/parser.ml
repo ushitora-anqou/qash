@@ -7,8 +7,10 @@ let string_of_token = function
   | P.ID s -> "ID " ^ s
   | P.INDENT -> "INDENT"
   | P.INT_LIT i -> "INT_LIT " ^ string_of_int i
+  | P.K_ASSERT -> "!assert"
   | P.K_IMPORT -> "!import"
   | P.K_OPEN_ACCOUNT -> "!open-account"
+  | P.K_SHOW -> "!show"
   | P.MINUS -> "MINUS"
   | P.SPACE n -> "SPACE " ^ string_of_int n
   | P.STAR -> "STAR"

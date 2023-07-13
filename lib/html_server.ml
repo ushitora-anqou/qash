@@ -184,7 +184,7 @@ let jingoo_model_of_transactions rows =
        ]
 
 let serve in_filename =
-  let m = Loader.load_file in_filename in
+  let m, _ = Loader.load_file in_filename in
   let%lwt con = Sql_writer.dump "sqlite3::memory:" m in
 
   let%lwt model_gl =

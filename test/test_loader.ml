@@ -2,7 +2,7 @@ open Qash
 
 let test_overwrite () =
   let t = Loader.load_file "../../../test/src/01.qash" in
-  let Model.{ accounts; transactions } = t in
+  let Model.{ accounts; transactions; _ }, _ = t in
   assert (
     accounts
     |> List.map (fun (a : Model.open_account) -> a.account |> String.concat ":")

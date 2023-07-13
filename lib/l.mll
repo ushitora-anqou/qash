@@ -33,6 +33,8 @@ rule main = parse
   match s with
   | "!import" -> P.K_IMPORT
   | "!open-account" -> P.K_OPEN_ACCOUNT
+  | "!assert" -> P.K_ASSERT
+  | "!show" -> P.K_SHOW
   | _ -> raise (Error ("unknown keyword: " ^ s))
 }
 | '#' [ ^ ' ' '\t' '\n' ]+ as s {
