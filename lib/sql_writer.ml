@@ -58,6 +58,24 @@ WITH RECURSIVE tree(id, name, currency, parent_id, depth) AS (
 SELECT id, name, currency, depth FROM tree
 |}
 
+    let create_tags =
+      (unit ->. unit)
+        {|
+CREATE TABLE tags (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+)|}
+
+    let create_transaction_tag =
+      (unit ->. unit)
+        {|
+CREATE TABLE transaction_tags (
+  transaction_id INTEGER NOT NULL,
+  tag_id INTEGER NOT NULL,
+  FOREIGN KEY (transaction_id) REFERENCES transactions (id),
+  FOREIGN KEY (tag_id) REFERENCES tags (id)
+)|}
+
     let insert_account =
       (tup3 string string (option int) ->! int)
         {|INSERT INTO accounts (name, currency, parent_id) VALUES (?, ?, ?) RETURNING id|}
@@ -70,12 +88,21 @@ SELECT id, name, currency, depth FROM tree
       (tup4 int int int string ->. unit)
         {|INSERT INTO postings (account_id, transaction_id, amount, narration) VALUES (?, ?, ?, ?)|}
 
+    let insert_tag =
+      (string ->! int) {|INSERT INTO tags (name) VALUES (?) RETURNING id|}
+
+    let insert_transaction_tag =
+      (tup2 int int ->. unit)
+        {|INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)|}
+
     let select_account =
       (tup3 string string (option int) ->? int)
         {|SELECT id FROM accounts WHERE name = ? AND currency = ? AND parent_id IS ?|}
 
     let select_account_by_fullname =
       (string ->! int) {|SELECT id FROM full_accounts WHERE name = ?|}
+
+    let select_tag = (string ->! int) {|SELECT id FROM tags WHERE name = ?|}
   end
 
   let raise_if_error f =
@@ -94,6 +121,12 @@ SELECT id, name, currency, depth FROM tree
 
   let create_full_accounts_view (module Db : Caqti_lwt.CONNECTION) =
     Db.exec Q.create_full_accounts_view () |> raise_if_error
+
+  let create_tags (module Db : Caqti_lwt.CONNECTION) =
+    Db.exec Q.create_tags () |> raise_if_error
+
+  let create_transaction_tags (module Db : Caqti_lwt.CONNECTION) =
+    Db.exec Q.create_transaction_tag () |> raise_if_error
 
   let insert_account (module Db : Caqti_lwt.CONNECTION) ~account ~currency =
     let parent_id = ref None in
@@ -120,6 +153,16 @@ SELECT id, name, currency, depth FROM tree
     Db.exec Q.insert_posting (account_id, transaction_id, amount, narration)
     |> raise_if_error
 
+  let insert_tag (module Db : Caqti_lwt.CONNECTION) ~name =
+    Db.find Q.insert_tag name |> raise_if_error
+
+  let insert_transaction_tag (module Db : Caqti_lwt.CONNECTION) ~transaction_id
+      ~tag_id =
+    Db.exec Q.insert_transaction_tag (transaction_id, tag_id) |> raise_if_error
+
+  let select_tag (module Db : Caqti_lwt.CONNECTION) ~name =
+    Db.find Q.select_tag name |> raise_if_error
+
   let select_account_by_fullname (module Db : Caqti_lwt.CONNECTION) account =
     Db.find Q.select_account_by_fullname (string_of_account account)
     |> raise_if_error
@@ -130,6 +173,8 @@ let dump uri (model : Model.t) =
   Store.create_accounts con;%lwt
   Store.create_transactions con;%lwt
   Store.create_postings con;%lwt
+  Store.create_tags con;%lwt
+  Store.create_transaction_tags con;%lwt
 
   (model.accounts
   |> Lwt_list.iter_s @@ fun (acc : Model.open_account) ->
@@ -142,6 +187,14 @@ let dump uri (model : Model.t) =
      let%lwt tx_id =
        Store.insert_transaction con ~date:tx.date ~narration:tx.narration
      in
+
+     tx.tags
+     |> Lwt_list.map_s (fun name ->
+            try%lwt Store.insert_tag con ~name
+            with _ -> Store.select_tag con ~name)
+     >>= Lwt_list.iter_s (fun tag_id ->
+             Store.insert_transaction_tag con ~transaction_id:tx_id ~tag_id);%lwt
+
      tx.postings
      |> Lwt_list.iter_s @@ fun (p : Model.posting) ->
         let%lwt account_id = Store.select_account_by_fullname con p.account in

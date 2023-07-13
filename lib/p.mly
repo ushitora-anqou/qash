@@ -7,6 +7,7 @@
 %token <int> INT_LIT
 %token <string> ID
 %token <string> STRING_LIT
+%token <string> TAG
 
 %start toplevel
 %type <Model.directive list> toplevel
@@ -64,8 +65,8 @@ Transactions :
 }
 
 Transaction :
-| STAR date=Date narration=STRING_LIT INDENT postings=separated_list(BR, Posting) DEDENT {
-  Model.make_transaction ~date ~narration ~postings ()
+| STAR date=Date narration=STRING_LIT tags=list(TAG) INDENT postings=separated_list(BR, Posting) DEDENT {
+  Model.make_transaction ~date ~narration ~postings ~tags ()
 }
 
 Posting :

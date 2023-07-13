@@ -35,6 +35,9 @@ rule main = parse
   | "!open-account" -> P.K_OPEN_ACCOUNT
   | _ -> raise (Error ("unknown keyword: " ^ s))
 }
+| '#' [ ^ ' ' '\t' '\n' ]+ as s {
+  P.TAG s
+}
 | [ ^ '!' ' ' '\t' '\n' '0'-'9' '-' ] [ ^ ' ' '\t' '\n' ]+ {
   let id = Lexing.lexeme lexbuf in
   P.ID id

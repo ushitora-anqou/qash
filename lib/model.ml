@@ -23,8 +23,14 @@ type posting = {
 [@@deriving make, yojson]
 
 type date = { year : int; month : int; day : int } [@@deriving make, yojson]
+type tag = string [@@deriving yojson]
 
-type transaction = { date : date; narration : string; postings : posting list }
+type transaction = {
+  date : date;
+  narration : string;
+  postings : posting list;
+  tags : tag list;
+}
 [@@deriving make, yojson]
 
 type transactions = transaction list [@@deriving yojson]

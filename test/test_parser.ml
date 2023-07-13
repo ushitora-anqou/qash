@@ -45,6 +45,7 @@ let test_case1 () =
     {
       date = make_date ~year:2014 ~month:5 ~day:5;
       narration = "信販C ピヨカ-ドサ-ビ";
+      tags = [];
       postings =
         [
           make_posting
@@ -59,6 +60,7 @@ let test_case1 () =
     {
       date = make_date ~year:2023 ~month:5 ~day:8;
       narration = "コンビニ";
+      tags = [];
       postings =
         [
           make_posting ~account:[ "資産"; "流動資産"; "現金" ] ~amount:(-502) ();

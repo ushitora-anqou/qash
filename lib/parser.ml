@@ -13,6 +13,7 @@ let string_of_token = function
   | P.SPACE n -> "SPACE " ^ string_of_int n
   | P.STAR -> "STAR"
   | P.STRING_LIT s -> "STRING_LIT " ^ s
+  | P.TAG s -> "TAG " ^ s
 
 (* Thanks to: https://zehnpaard.hatenablog.com/entry/2019/06/11/090829 *)
 module Lexer = struct
