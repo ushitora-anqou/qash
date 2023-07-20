@@ -9,9 +9,14 @@ let to_json filename =
       Model.yojson_of_directives r |> Yojson.Safe.to_string |> print_endline
 
 let of_json filename =
-  with_file filename @@ fun ic ->
-  Yojson.Safe.from_channel ic
-  |> Model.directives_of_yojson |> Model.string_of_directives |> print_endline
+  try
+    with_file filename @@ fun ic ->
+    Yojson.Safe.from_channel ic
+    |> Model.directives_of_yojson |> Model.string_of_directives |> print_endline
+  with Ppx_yojson_conv_lib.Yojson_conv.Of_yojson_error (e, j) ->
+    Printf.eprintf "JSON parse error: %s\n%s\n"
+      (match e with Failure s -> s | _ -> Printexc.to_string e)
+      (Yojson.Safe.pretty_to_string j)
 
 let of_gnucash_csv transactions_csv_filename =
   with_file transactions_csv_filename @@ fun ic ->
