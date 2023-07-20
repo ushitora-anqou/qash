@@ -199,7 +199,7 @@ let dump uri (model : Model.t) =
      |> Lwt_list.iter_s @@ fun (p : Model.posting) ->
         let%lwt account_id = Store.select_account_by_fullname con p.account in
         Store.insert_posting con ~account_id ~transaction_id:tx_id
-          ~amount:p.amount ~narration:p.narration);%lwt
+          ~amount:(Option.get p.amount) ~narration:p.narration);%lwt
 
   Lwt.return con
 

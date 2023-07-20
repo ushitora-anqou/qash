@@ -76,8 +76,8 @@ Transaction :
 }
 
 Posting :
-| account=Account amount=ArithExpr {
-  Model.make_posting ~account ~amount ()
+| account=Account amount=option(ArithExpr) {
+  Model.make_posting ~account ?amount ()
 }
 
 ArithExpr :

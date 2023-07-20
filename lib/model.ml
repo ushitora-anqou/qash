@@ -14,7 +14,7 @@ type price = int [@@deriving yojson]
 
 type posting = {
   account : account;
-  amount : amount;
+  amount : amount option;
   cost : cost option; [@yojson.option]
   price : price option; [@yojson.option]
   narration : string; [@default ""] [@yojson_drop_default ( = )]
@@ -64,7 +64,9 @@ let string_of_date d = Printf.sprintf "%04d-%02d-%02d" d.year d.month d.day
 let string_of_account : account -> string = String.concat ":"
 
 let string_of_posting (p : posting) =
-  Printf.sprintf "%s %d" (string_of_account p.account) p.amount
+  Printf.sprintf "%s%s"
+    (string_of_account p.account)
+    (p.amount |> Option.fold ~none:"" ~some:(fun x -> " " ^ string_of_int x))
 
 let amount_of_string : string -> amount =
   String.split_on_char ',' *> String.concat "" *> int_of_string
@@ -75,6 +77,9 @@ let pp_transaction ppf t =
     (Format.pp_print_list (fun ppf p ->
          Format.fprintf ppf "%s" (string_of_posting p)))
     t.postings
+
+let string_of_transaction t =
+  Format.asprintf "%a" pp_transaction t |> String.trim
 
 let pp_directive ppf = function
   | OpenAccount { account; currency } ->

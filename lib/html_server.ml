@@ -176,8 +176,11 @@ let jingoo_model_of_transactions rows =
                       [
                         ("narration", Tstr p.narration);
                         ("account", Tstr (string_of_account p.account));
-                        ("amount", Tint p.amount);
-                        ("abs_amount_s", Tstr (string_of_amount (abs p.amount)));
+                        ("amount", Tint (Option.get p.amount));
+                        ( "abs_amount_s",
+                          Tstr
+                            (p.amount |> Option.get |> abs |> string_of_amount)
+                        );
                         ("balance", Tint p.balance);
                         ("balance_s", Tstr (string_of_amount p.balance));
                       ])) );

@@ -15,6 +15,34 @@ let load_file filename =
                   else bt))
          base
   in
+  let complete_transaction (t : Model.transaction) =
+    let num_holes, balance =
+      t.postings
+      |> List.fold_left
+           (fun (num_holes, balance) (p : Model.posting) ->
+             match p.amount with
+             | None -> (num_holes + 1, balance)
+             | Some a -> (num_holes, balance + a))
+           (0, 0)
+    in
+    match num_holes with
+    | 0 -> t
+    | 1 ->
+        {
+          t with
+          postings =
+            t.postings
+            |> List.map (fun (p : Model.posting) ->
+                   {
+                     p with
+                     amount = Some (p.amount |> Option.value ~default:(-balance));
+                   });
+        }
+    | _ ->
+        failwith
+          ("Invalid transaction: too many holes: %s"
+          ^ Model.string_of_transaction t)
+  in
   let rec aux filename : Model.t * note list =
     let wd = Filename.dirname filename in
     match Parser.parse_file filename with
@@ -26,7 +54,11 @@ let load_file filename =
                | Model.OpenAccount row ->
                    ({ t with accounts = row :: t.accounts }, notes)
                | Transaction row ->
-                   ({ t with transactions = row :: t.transactions }, notes)
+                   ( {
+                       t with
+                       transactions = complete_transaction row :: t.transactions;
+                     },
+                     notes )
                | Import { filename; transactions = overlay } ->
                    let filepath = Filename.concat wd filename in
                    let (t' : Model.t), (notes : note list) = aux filepath in
