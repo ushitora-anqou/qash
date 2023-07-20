@@ -17,6 +17,7 @@ depends: [
   "csv"
   "dune" {>= "3.8"}
   "jingoo"
+  "logs"
   "lwt_ppx"
   "menhir"
   "ocaml"

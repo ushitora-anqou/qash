@@ -29,6 +29,7 @@
   csv
   dune
   jingoo
+  logs
   lwt_ppx
   menhir
   ocaml

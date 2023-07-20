@@ -119,6 +119,9 @@ let dump in_filename out_filename =
 let serve in_filename = Lwt_main.run (Html_server.serve in_filename)
 
 let () =
+  Logs.set_reporter (Logs_fmt.reporter ());
+  Logs.set_level (Some Logs.Debug);
+
   let open Cmdliner in
   Cmd.(
     group
