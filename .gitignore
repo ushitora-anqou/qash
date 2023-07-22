@@ -32,3 +32,4 @@ _opam/
 misc
 .~lock.*
 *.sqlite3
+*.html
