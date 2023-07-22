@@ -1,6 +1,6 @@
 {%- macro bars_table (canvas_id, rows) -%}
 <div>
-<canvas id="{{ canvas_id }}" width=600 height=600></canvas>
+<canvas id="{{ canvas_id }}" width=1000 height=600></canvas>
 <script>
 new Chart(document.getElementById('{{ canvas_id }}'), {
   type: 'bar',

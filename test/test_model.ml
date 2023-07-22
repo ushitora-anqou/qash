@@ -3,7 +3,8 @@ open Qash
 let test_yojson () =
   let expected_open_account1 =
     let open Model in
-    OpenAccount { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY" }
+    OpenAccount
+      { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY"; kind = Asset }
   in
   let expected_transaction1 =
     let open Model in
@@ -70,7 +71,8 @@ let test_case1 () =
   assert (
     Model.string_of_directives
       [
-        OpenAccount { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY" };
+        OpenAccount
+          { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY"; kind = Asset };
         Transaction
           Model.(
             make_transaction
@@ -114,7 +116,8 @@ let test_case1 () =
     let open Model in
     let expected =
       [
-        OpenAccount { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY" };
+        OpenAccount
+          { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY"; kind = Asset };
         Transaction
           Model.(
             make_transaction

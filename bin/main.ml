@@ -87,7 +87,18 @@ let of_gnucash_csv transactions_csv_filename =
            t.postings |> List.map (fun (p : posting) -> p.account))
     |> List.flatten |> List.sort_uniq compare
     |> List.map (fun account ->
-           Model.make_open_account ~account ~currency:"JPY")
+           (* FIXME *)
+           let open Model in
+           let kind =
+             match account with
+             | "資産" :: _ -> Asset
+             | "負債" :: _ -> Liability
+             | "収益" :: _ -> Income
+             | "費用" :: _ -> Expense
+             | "資本" :: _ -> Equity
+             | _ -> Asset
+           in
+           Model.make_open_account ~account ~currency:"JPY" ~kind)
   in
 
   (open_accounts |> List.map (fun p -> Model.OpenAccount p))

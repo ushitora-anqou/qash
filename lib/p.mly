@@ -33,10 +33,20 @@ Date :
 
 Directive :
 (* !open-account *)
-| K_OPEN_ACCOUNT account=Account currency=ID {
+| K_OPEN_ACCOUNT kind=ID account=Account currency=ID {
   Model.OpenAccount {
     account;
     currency;
+    kind =
+      (
+        match kind with
+        | "asset" -> Model.Asset
+        | "liability" -> Liability
+        | "equity" -> Equity
+        | "income" -> Income
+        | "expense" -> Expense
+        | _ -> failwith "invalid account kind"
+      );
   }
 }
 | K_IMPORT filename=STRING_LIT {

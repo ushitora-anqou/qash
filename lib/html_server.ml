@@ -41,51 +41,81 @@ ORDER BY name
 |}
 
     let select_cumulative_sum_amount_by_depth_account_year =
-      (tup3 int string string ->* tup3 string string int)
+      (tup3 int int int
+      ->* tup2 string
+            (tup4 int int int
+               (tup4 int int int (tup4 int int int (tup3 int int int)))))
         {|
-WITH RECURSIVE temp(id, name, parent_id, depth, target) AS (
-  SELECT id, name, parent_id, 0, NULL FROM accounts WHERE parent_id IS NULL
-  UNION ALL
-  SELECT a.id, t.name || ':' || a.name, a.parent_id, t.depth + 1,
-         CASE WHEN t.depth = ? THEN t.name ELSE t.target END
-  FROM accounts a JOIN temp t ON a.parent_id = t.id
+WITH RECURSIVE account_lifted (id, depth, lifted) AS (
+    SELECT id, 0, id FROM accounts WHERE parent_id IS NULL
+    UNION ALL
+    SELECT a.id, t.depth + 1, CASE WHEN t.depth + 1 <= $1 THEN a.id ELSE t.lifted END
+    FROM accounts a INNER JOIN account_lifted t ON a.parent_id = t.id
+),
+const AS (
+    SELECT
+        CAST($3 AS TEXT) AS year,
+        CAST($3 + 1 AS TEXT) AS next_year,
+        CAST($3 - 1 AS TEXT) AS prev_year
 )
-SELECT ym, key_name, sum_amount
-FROM (
-  SELECT DISTINCT
-    ym, key_name,
-    SUM(amount) OVER (PARTITION BY key_name ORDER BY ym) AS sum_amount,
-    year
-  FROM (
-    SELECT strftime("%Y-%m", t.created_at) AS ym,
-           COALESCE(temp.target, temp.name) AS key_name,
-           p.amount AS amount,
-           strftime('%Y', t.created_at) AS year
-    FROM postings p
-    INNER JOIN temp ON p.account_id = temp.id
-    INNER JOIN transactions t ON p.transaction_id = t.id))
-WHERE key_name LIKE ? AND year = ?
-ORDER BY key_name, ym
+SELECT DISTINCT
+    a.name,
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-01-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-02-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-03-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-04-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-05-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-06-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-07-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-08-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-09-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-10-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-11-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE t.created_at < c.year||'-12-01' ) OVER ( PARTITION BY al.lifted ), 0)
+FROM postings p, const c
+INNER JOIN transactions t ON p.transaction_id = t.id
+INNER JOIN account_lifted al ON p.account_id = al.id
+INNER JOIN full_accounts a ON al.lifted = a.id
+WHERE a.kind = $2
 |}
 
     let select_sum_amount_by_depth_account_year =
-      (tup3 int string string ->* tup3 string string int)
+      (tup3 int int int
+      ->* tup2 string
+            (tup4 int int int
+               (tup4 int int int (tup4 int int int (tup3 int int int)))))
         {|
-WITH RECURSIVE temp(id, name, parent_id, depth, target) AS (
-  SELECT id, name, parent_id, 0, NULL FROM accounts WHERE parent_id IS NULL
-  UNION ALL
-  SELECT a.id, t.name || ':' || a.name, a.parent_id, t.depth + 1,
-         CASE WHEN t.depth = ? THEN t.name ELSE t.target END
-  FROM accounts a JOIN temp t ON a.parent_id = t.id
+WITH RECURSIVE account_lifted (id, depth, lifted) AS (
+    SELECT id, 0, id FROM accounts WHERE parent_id IS NULL
+    UNION ALL
+    SELECT a.id, t.depth + 1, CASE WHEN t.depth + 1 <= $1 THEN a.id ELSE t.lifted END
+    FROM accounts a INNER JOIN account_lifted t ON a.parent_id = t.id
+),
+const AS (
+    SELECT
+        CAST($3 AS TEXT) AS year,
+        CAST($3 + 1 AS TEXT) AS next_year,
+        CAST($3 - 1 AS TEXT) AS prev_year
 )
-SELECT strftime("%Y-%m", t.created_at) AS ym,
-       COALESCE(temp.target, temp.name) AS key_name, sum(p.amount)
-FROM postings p
-INNER JOIN temp ON p.account_id = temp.id
+SELECT DISTINCT
+    a.name,
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.prev_year||'-12-01' <= t.created_at AND t.created_at < c.year||'-01-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-01-01' <= t.created_at AND t.created_at < c.year||'-02-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-02-01' <= t.created_at AND t.created_at < c.year||'-03-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-03-01' <= t.created_at AND t.created_at < c.year||'-04-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-04-01' <= t.created_at AND t.created_at < c.year||'-05-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-05-01' <= t.created_at AND t.created_at < c.year||'-06-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-06-01' <= t.created_at AND t.created_at < c.year||'-07-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-07-01' <= t.created_at AND t.created_at < c.year||'-08-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-08-01' <= t.created_at AND t.created_at < c.year||'-09-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-09-01' <= t.created_at AND t.created_at < c.year||'-10-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-10-01' <= t.created_at AND t.created_at < c.year||'-11-01' ) OVER ( PARTITION BY al.lifted ), 0),
+    COALESCE(SUM(p.amount) FILTER ( WHERE c.year     ||'-11-01' <= t.created_at AND t.created_at < c.year||'-12-01' ) OVER ( PARTITION BY al.lifted ), 0)
+FROM postings p, const c
 INNER JOIN transactions t ON p.transaction_id = t.id
-WHERE key_name LIKE ? AND strftime('%Y', t.created_at) = ?
-GROUP BY key_name, ym
-ORDER BY key_name, ym
+INNER JOIN account_lifted al ON p.account_id = al.id
+INNER JOIN full_accounts a ON al.lifted = a.id
+WHERE a.kind = $2
 |}
   end
 
@@ -204,59 +234,62 @@ let serve in_filename =
       accounts
   in
 
-  let get_model ~name ~depth ~year kind column =
-    let like_query = name ^ ":%" in
+  let get_model ~account ~depth ~year kind column =
+    let account = Model.int_of_account_kind account in
     let%lwt raw_data =
       match kind with
       | `Stock ->
           Store.select_cumulative_sum_amount_by_depth_account_year con ~depth
-            ~account:like_query ~year
+            ~account ~year
       | `Flow ->
-          Store.select_sum_amount_by_depth_account_year con ~depth
-            ~account:like_query ~year
+          Store.select_sum_amount_by_depth_account_year con ~depth ~account
+            ~year
     in
-    let%lwt accounts_depth =
-      Store.select_accounts_by_depth_name con ~depth ~name:like_query
-    in
+    let open Jingoo.Jg_types in
     let labels =
-      iota 12 |> List.map (fun i -> Printf.sprintf "%s-%02d" year (i + 1))
+      iota 12
+      |> List.map (fun i -> Tstr (Printf.sprintf "%d-%02d-01" year (i + 1)))
     in
-    let data = Hashtbl.create 0 in
-    List.iter
-      (fun (ym, account, amount) ->
-        Hashtbl.add data (account, ym)
-          (match column with `Debt -> amount | `Credit -> -amount))
-      raw_data;
-    Lwt.return
-      Jingoo.Jg_types.(
-        Tobj
-          [
-            ("labels", Tlist (labels |> List.map (fun s -> Tstr s)));
-            ( "data",
-              Tobj
-                (accounts_depth
-                |> List.map (fun account ->
-                       ( account,
-                         Tlist
-                           (labels
-                           |> List.map (fun label ->
-                                  Tint
-                                    (Hashtbl.find_opt data (account, label)
-                                    |> Option.value ~default:0))) ))) );
-          ])
+    let data =
+      raw_data
+      |> List.map
+           (fun
+             ( account_name,
+               (jan, feb, mar, (apr, may, jun, (jul, aug, sep, (oct, nov, dec))))
+             )
+           ->
+             let aux x = match column with `Debt -> x | `Credit -> -x in
+             ( account_name,
+               Tlist
+                 [
+                   Tint (aux jan);
+                   Tint (aux feb);
+                   Tint (aux mar);
+                   Tint (aux apr);
+                   Tint (aux may);
+                   Tint (aux jun);
+                   Tint (aux jul);
+                   Tint (aux aug);
+                   Tint (aux sep);
+                   Tint (aux oct);
+                   Tint (aux nov);
+                   Tint (aux dec);
+                 ] ))
+    in
+    Lwt.return (Tobj [ ("labels", Tlist labels); ("data", Tobj data) ])
   in
 
   let%lwt model_asset =
-    get_model ~name:"資産" ~depth:1 ~year:"2023" `Stock `Debt
+    get_model ~account:Asset ~depth:1 ~year:2023 `Stock `Debt
   in
   let%lwt model_liability =
-    get_model ~name:"負債" ~depth:1 ~year:"2023" `Stock `Credit
+    get_model ~account:Liability ~depth:1 ~year:2023 `Stock `Credit
   in
   let%lwt model_expense =
-    get_model ~name:"費用" ~depth:1 ~year:"2023" `Flow `Debt
+    get_model ~account:Expense ~depth:1 ~year:2023 `Flow `Debt
   in
   let%lwt model_income =
-    get_model ~name:"収益" ~depth:1 ~year:"2023" `Flow `Credit
+    get_model ~account:Income ~depth:1 ~year:2023 `Flow `Credit
   in
 
   let models =

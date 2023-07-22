@@ -13,3 +13,5 @@ let ignore_lwt f = Lwt.map (fun _ -> ()) f
 let iota n =
   let rec aux acc = function 0 -> acc | n -> aux ((n - 1) :: acc) (n - 1) in
   aux [] n
+
+let failwithf fmt = Printf.ksprintf failwith fmt

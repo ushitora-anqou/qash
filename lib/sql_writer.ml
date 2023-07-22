@@ -1,4 +1,5 @@
 open Lwt.Infix
+open Util
 
 module Store = struct
   let string_of_date (x : Model.date) =
@@ -18,6 +19,7 @@ CREATE TABLE accounts (
   name TEXT NOT NULL,
   currency TEXT NOT NULL,
   parent_id INTEGER,
+  kind INTEGER NOT NULL,
 
   UNIQUE (name, currency, parent_id)
 )|}
@@ -50,12 +52,12 @@ CREATE TABLE postings (
       (unit ->. unit)
         {|
 CREATE VIEW full_accounts AS
-WITH RECURSIVE tree(id, name, currency, parent_id, depth) AS (
-  SELECT id, name, currency, parent_id, 0 FROM accounts WHERE parent_id IS NULL
+WITH RECURSIVE tree(id, name, currency, parent_id, kind, depth) AS (
+  SELECT id, name, currency, parent_id, kind, 0 FROM accounts WHERE parent_id IS NULL
   UNION ALL
-  SELECT a.id, t.name || ':' || a.name, a.currency, a.parent_id, t.depth + 1 FROM accounts a JOIN tree t ON a.parent_id = t.id
+  SELECT a.id, t.name || ':' || a.name, a.currency, a.parent_id, a.kind, t.depth + 1 FROM accounts a JOIN tree t ON a.parent_id = t.id
 )
-SELECT id, name, currency, depth FROM tree
+SELECT id, name, currency, kind, depth FROM tree
 |}
 
     let create_tags =
@@ -77,8 +79,8 @@ CREATE TABLE transaction_tags (
 )|}
 
     let insert_account =
-      (tup3 string string (option int) ->! int)
-        {|INSERT INTO accounts (name, currency, parent_id) VALUES (?, ?, ?) RETURNING id|}
+      (tup4 string string (option int) int ->! int)
+        {|INSERT INTO accounts (name, currency, parent_id, kind) VALUES (?, ?, ?, ?) RETURNING id|}
 
     let insert_transaction =
       (tup2 string string ->! int)
@@ -128,7 +130,8 @@ CREATE TABLE transaction_tags (
   let create_transaction_tags (module Db : Caqti_lwt.CONNECTION) =
     Db.exec Q.create_transaction_tag () |> raise_if_error
 
-  let insert_account (module Db : Caqti_lwt.CONNECTION) ~account ~currency =
+  let insert_account (module Db : Caqti_lwt.CONNECTION) ~account ~currency ~kind
+      =
     let parent_id = ref None in
     account
     |> Lwt_list.iter_s @@ fun name ->
@@ -139,7 +142,7 @@ CREATE TABLE transaction_tags (
          with
          | Some id -> Lwt.return id
          | None ->
-             Db.find Q.insert_account (name, currency, !parent_id)
+             Db.find Q.insert_account (name, currency, !parent_id, kind)
              |> raise_if_error
        in
        Lwt.return (parent_id := Some id)
@@ -164,8 +167,14 @@ CREATE TABLE transaction_tags (
     Db.find Q.select_tag name |> raise_if_error
 
   let select_account_by_fullname (module Db : Caqti_lwt.CONNECTION) account =
-    Db.find Q.select_account_by_fullname (string_of_account account)
-    |> raise_if_error
+    match%lwt
+      Db.find Q.select_account_by_fullname (string_of_account account)
+    with
+    | Ok x -> Lwt.return x
+    | Error e ->
+        failwithf "Couldn't select account by fullname: %s: %s"
+          (string_of_account account)
+          (Caqti_error.show e)
 end
 
 let dump uri (model : Model.t) =
@@ -178,7 +187,8 @@ let dump uri (model : Model.t) =
 
   (model.accounts
   |> Lwt_list.iter_s @@ fun (acc : Model.open_account) ->
-     Store.insert_account con ~account:acc.account ~currency:acc.currency);%lwt
+     Store.insert_account con ~account:acc.account ~currency:acc.currency
+       ~kind:(Model.int_of_account_kind acc.kind));%lwt
 
   Store.create_full_accounts_view con;%lwt
 

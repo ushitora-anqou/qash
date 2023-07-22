@@ -35,7 +35,28 @@ type transaction = {
 
 type transactions = transaction list [@@deriving yojson]
 
-type open_account = { account : account; currency : string }
+type account_kind = Asset | Liability | Equity | Income | Expense
+[@@deriving yojson]
+
+let string_of_account_kind = function
+  | Asset -> "asset"
+  | Liability -> "liability"
+  | Equity -> "equity"
+  | Income -> "income"
+  | Expense -> "expense"
+
+let int_of_account_kind = function
+  | Asset -> 0
+  | Liability -> 1
+  | Equity -> 2
+  | Income -> 3
+  | Expense -> 4
+
+type open_account = {
+  account : account;
+  currency : string;
+  kind : account_kind;
+}
 [@@deriving make, yojson]
 
 type directive =
@@ -82,8 +103,9 @@ let string_of_transaction t =
   Format.asprintf "%a" pp_transaction t |> String.trim
 
 let pp_directive ppf = function
-  | OpenAccount { account; currency } ->
-      Format.fprintf ppf "!open-account %s %s\n"
+  | OpenAccount { account; currency; kind } ->
+      Format.fprintf ppf "!open-account %s %s %s\n"
+        (string_of_account_kind kind)
         (string_of_account account)
         currency
   | Transaction t ->
