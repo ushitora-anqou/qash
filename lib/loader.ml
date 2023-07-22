@@ -69,7 +69,9 @@ let load_file filename =
                          t with
                          transactions =
                            t.transactions
-                           @ overwrite_transactions t'.transactions overlay;
+                           @ (overlay
+                             |> List.map complete_transaction
+                             |> overwrite_transactions t'.transactions);
                        },
                        notes )
                | Assert s -> (t, Assert s :: notes)

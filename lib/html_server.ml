@@ -30,7 +30,8 @@ ORDER BY t.created_at, t.id, p.id
 |}
 
     let select_accounts =
-      (unit ->* string) {|SELECT name FROM full_accounts ORDER BY name|}
+      (unit ->* tup2 string int)
+        {|SELECT name, kind FROM full_accounts ORDER BY name|}
 
     let select_accounts_by_depth_name =
       (tup2 int string ->* string)
@@ -178,7 +179,7 @@ WHERE a.kind = $2
     |> raise_if_error
 end
 
-let jingoo_model_of_transactions rows =
+let jingoo_model_of_transactions account_kind rows =
   let open Jingoo in
   let open Jg_types in
   let open Model in
@@ -202,6 +203,11 @@ let jingoo_model_of_transactions rows =
            Tlist
              (tx.postings
              |> List.map (fun (p : posting) ->
+                    let balance =
+                      match account_kind with
+                      | Model.Asset | Expense -> p.balance
+                      | Liability | Equity | Income -> -p.balance
+                    in
                     Tobj
                       [
                         ("narration", Tstr p.narration);
@@ -211,8 +217,8 @@ let jingoo_model_of_transactions rows =
                           Tstr
                             (p.amount |> Option.get |> abs |> string_of_amount)
                         );
-                        ("balance", Tint p.balance);
-                        ("balance_s", Tstr (string_of_amount p.balance));
+                        ("balance", Tint balance);
+                        ("balance_s", Tstr (string_of_amount balance));
                       ])) );
        ]
 
@@ -221,17 +227,15 @@ let serve in_filename =
   let%lwt con = Sql_writer.dump "sqlite3::memory:" m in
 
   let%lwt model_gl =
-    Store.select_transactions con >|= jingoo_model_of_transactions
+    Store.select_transactions con >|= jingoo_model_of_transactions Model.Asset
   in
 
-  let%lwt accounts = Store.select_accounts con in
   let%lwt model_accounts =
-    Lwt_list.map_s
-      (fun account ->
-        Store.select_account_transactions con account
-        >|= jingoo_model_of_transactions
-        >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
-      accounts
+    Store.select_accounts con
+    >>= Lwt_list.map_s (fun (account, kind) ->
+            Store.select_account_transactions con account
+            >|= jingoo_model_of_transactions (Model.account_kind_of_int kind)
+            >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
   in
 
   let get_model ~account ~depth ~year kind column =

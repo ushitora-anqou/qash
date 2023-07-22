@@ -52,6 +52,14 @@ let int_of_account_kind = function
   | Income -> 3
   | Expense -> 4
 
+let account_kind_of_int = function
+  | 0 -> Asset
+  | 1 -> Liability
+  | 2 -> Equity
+  | 3 -> Income
+  | 4 -> Expense
+  | _ -> failwith "account_kind_of_int: invalid account kind"
+
 type open_account = {
   account : account;
   currency : string;
