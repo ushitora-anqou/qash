@@ -127,7 +127,7 @@ let dump in_filename out_filename =
   in
   Lwt.return_unit
 
-let serve in_filename = Lwt_main.run (Html_server.serve in_filename)
+let serve = Html_server.serve
 
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());

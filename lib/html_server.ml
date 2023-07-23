@@ -222,7 +222,7 @@ let jingoo_model_of_transactions account_kind rows =
                       ])) );
        ]
 
-let serve in_filename =
+let generate_html in_filename =
   let m, _ = Loader.load_file in_filename in
   let%lwt con = Sql_writer.dump "sqlite3::memory:" m in
 
@@ -308,9 +308,47 @@ let serve in_filename =
       ]
   in
   with_file "lib/index.html.tpl" (fun f ->
-      f |> In_channel.input_all
-      |> Jingoo.Jg_template.from_string ~models
-      |> print_string);
-  print_newline ();
+      f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
+  |> Lwt.return
 
-  Lwt.return_unit
+let start_watching filepath streams =
+  let%lwt inotify = Lwt_inotify.create () in
+  let rec loop () =
+    try%lwt
+      Lwt_inotify.add_watch inotify filepath Inotify.[ S_Modify ] |> ignore_lwt;%lwt
+      let%lwt _, _events, _, _ = Lwt_inotify.read inotify in
+      Dream.info (fun m -> m "File updated");
+      !streams |> Lwt_list.iter_p (fun stream -> Dream.send stream "reload");%lwt
+      loop ()
+    with e ->
+      Dream.error (fun m -> m "Watching error: %s" (Printexc.to_string e));
+      Lwt.return_unit
+  in
+  Lwt.return @@ Lwt.async loop
+
+let serve in_filename =
+  let streams = ref [] in
+  let finalize_websocket_stream ws () =
+    let%lwt _ = Dream.receive ws in
+    Dream.close_websocket ws;%lwt
+    streams := List.filter (( != ) ws) !streams;
+    Dream.info (fun m -> m "WebSocket stream closed");
+    Lwt.return_unit
+  in
+  let f =
+    start_watching in_filename streams;%lwt
+    Dream.info (fun m -> m "HTTP server started: localhost:8080");
+    Dream.serve @@ Dream.logger
+    @@ Dream.router
+         [
+           ( Dream.get "/ws" @@ fun _request ->
+             Dream.websocket ~close:false (fun ws ->
+                 streams := ws :: !streams;
+                 Lwt.async (finalize_websocket_stream ws);
+                 Lwt.return_unit) );
+           ( Dream.get "/" @@ fun _ ->
+             let%lwt html = generate_html in_filename in
+             Dream.html html );
+         ]
+  in
+  Lwt_main.run f
