@@ -9,12 +9,31 @@ module Store = struct
     let select_account_transactions =
       (string ->* tup3 int string (tup4 string string string (tup2 int int)))
         {|
-SELECT t.id, t.created_at, t.narration, p.narration, a.name, p.amount,
-       sum(p.amount) OVER (ORDER BY t.created_at, t.id, p.id)
+WITH target_transaction_ids AS (
+  SELECT p.transaction_id
+  FROM postings p
+  INNER JOIN full_accounts a ON p.account_id = a.id
+  WHERE a.name = $1
+), split_transaction_ids AS (
+  SELECT p.transaction_id
+  FROM postings p
+  WHERE p.transaction_id IN ( SELECT * FROM target_transaction_ids )
+  GROUP BY p.transaction_id
+  HAVING COUNT(*) > 2
+)
+SELECT t.id, t.created_at, t.narration, p.narration,
+       CASE a.name WHEN $1 THEN '-- スプリット取引 --' ELSE a.name END,
+       CASE a.name WHEN $1 THEN p.amount ELSE -p.amount END,
+       SUM(
+         CASE a.name WHEN $1 THEN p.amount ELSE -p.amount END
+       ) OVER (ORDER BY t.created_at, t.id, p.id)
 FROM postings p
 INNER JOIN full_accounts a ON p.account_id = a.id
 INNER JOIN transactions t ON p.transaction_id = t.id
-WHERE a.name = ?
+WHERE (t.id IN (SELECT * FROM split_transaction_ids) AND a.name = $1)
+OR    (t.id NOT IN (SELECT * FROM split_transaction_ids) AND
+       t.id IN (SELECT * FROM target_transaction_ids) AND
+       a.name <> $1)
 ORDER BY t.created_at, t.id, p.id
 |}
 
