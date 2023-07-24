@@ -78,6 +78,44 @@ CREATE TABLE transaction_tags (
   FOREIGN KEY (tag_id) REFERENCES tags (id)
 )|}
 
+    let create_account_transactions_view account =
+      (* FIXME: This query is insecure against SQL injection. *)
+      (unit ->. unit)
+      @@ Printf.sprintf
+           {|
+CREATE VIEW '%s' AS
+WITH target_transaction_ids AS (
+  SELECT p.transaction_id
+  FROM postings p
+  INNER JOIN full_accounts a ON p.account_id = a.id
+  WHERE a.name = '%s'
+), split_transaction_ids AS (
+  SELECT p.transaction_id
+  FROM postings p
+  WHERE p.transaction_id IN ( SELECT * FROM target_transaction_ids )
+  GROUP BY p.transaction_id
+  HAVING COUNT(*) > 2
+)
+SELECT t.id AS id,
+       t.created_at AS created_at,
+       t.narration AS narration,
+       p.narration AS p_narration,
+       CASE a.name WHEN '%s' THEN '-- スプリット取引 --' ELSE a.name END AS account,
+       CASE a.name WHEN '%s' THEN p.amount ELSE -p.amount END AS amount,
+       SUM(
+         CASE a.name WHEN '%s' THEN p.amount ELSE -p.amount END
+       ) OVER (ORDER BY t.created_at, t.id, p.id) AS balance
+FROM postings p
+INNER JOIN full_accounts a ON p.account_id = a.id
+INNER JOIN transactions t ON p.transaction_id = t.id
+WHERE (t.id IN (SELECT * FROM split_transaction_ids) AND a.name = '%s')
+OR    (t.id NOT IN (SELECT * FROM split_transaction_ids) AND
+       t.id IN (SELECT * FROM target_transaction_ids) AND
+       a.name <> '%s')
+ORDER BY t.created_at, t.id, p.id
+|}
+           account account account account account account account
+
     let insert_account =
       (tup4 string string (option int) int ->! int)
         {|INSERT INTO accounts (name, currency, parent_id, kind) VALUES (?, ?, ?, ?) RETURNING id|}
@@ -129,6 +167,10 @@ CREATE TABLE transaction_tags (
 
   let create_transaction_tags (module Db : Caqti_lwt.CONNECTION) =
     Db.exec Q.create_transaction_tag () |> raise_if_error
+
+  let create_account_transactions_view (module Db : Caqti_lwt.CONNECTION)
+      ~account =
+    Db.exec (Q.create_account_transactions_view account) () |> raise_if_error
 
   let insert_account (module Db : Caqti_lwt.CONNECTION) ~account ~currency ~kind
       =
@@ -210,6 +252,11 @@ let dump uri (model : Model.t) =
         let%lwt account_id = Store.select_account_by_fullname con p.account in
         Store.insert_posting con ~account_id ~transaction_id:tx_id
           ~amount:(Option.get p.amount) ~narration:p.narration);%lwt
+
+  (model.accounts
+  |> Lwt_list.iter_s @@ fun (acc : Model.open_account) ->
+     Store.create_account_transactions_view con
+       ~account:(String.concat ":" acc.account));%lwt
 
   Lwt.return con
 
