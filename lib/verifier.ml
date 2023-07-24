@@ -1,4 +1,5 @@
 open Lwt.Infix
+open Util
 
 module Store = struct
   module Q = struct
@@ -46,13 +47,18 @@ let verify_notes (module Db : Caqti_lwt.CONNECTION) notes =
          | Ok () -> (
              let open Caqti_request.Infix in
              let open Caqti_type.Std in
-             let sql = match note with Loader.Assert s | Show s -> s in
-             match%lwt Db.find ((unit ->! string) sql) () with
-             | Error e -> Lwt.return_error (Caqti_error.show e)
-             | Ok s -> (
-                 match note with
-                 | Show _ | Assert _ ->
+             match note with
+             | Loader.Show sql -> (
+                 match%lwt Db.find ((unit ->! string) sql) () with
+                 | Error e -> Lwt.return_error (Caqti_error.show e)
+                 | Ok s ->
                      Printf.printf "%s\n" s;
+                     Lwt.return_ok ())
+             | Assert sql -> (
+                 match%lwt Db.find ((unit ->! int) sql) () with
+                 | Error e -> Lwt.return_error (Caqti_error.show e)
+                 | Ok s ->
+                     if s <> 1 then failwithf "Assertion failed: %s" sql;
                      Lwt.return_ok ())))
        (Ok ())
 
