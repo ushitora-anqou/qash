@@ -127,7 +127,17 @@ let dump in_filename out_filename =
   in
   Lwt.return_unit
 
-let serve = Html_server.serve
+let serve =
+  let interface, port =
+    match
+      Sys.getenv_opt "BIND"
+      |> Option.value ~default:"127.0.0.1:8080"
+      |> String.split_on_char ':'
+    with
+    | [ interface; port ] -> (interface, int_of_string port)
+    | _ -> failwithf "Invalid BIND: %s" (Sys.getenv "BIND")
+  in
+  Html_server.serve ~interface ~port
 
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());

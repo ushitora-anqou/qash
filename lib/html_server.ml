@@ -326,7 +326,7 @@ let start_watching filepath streams =
   in
   Lwt.return @@ Lwt.async loop
 
-let serve in_filename =
+let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
   let streams = ref [] in
   let finalize_websocket_stream ws () =
     let%lwt _ = Dream.receive ws in
@@ -337,8 +337,9 @@ let serve in_filename =
   in
   let f =
     start_watching in_filename streams;%lwt
-    Dream.info (fun m -> m "HTTP server started: localhost:8080");
-    Dream.serve @@ Dream.logger
+    Dream.info (fun m -> m "HTTP server started: %s:%d" interface port);
+    Dream.serve ~interface ~port
+    @@ Dream.logger
     @@ Dream.router
          [
            ( Dream.get "/ws" @@ fun _request ->
