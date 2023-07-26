@@ -43,6 +43,7 @@ let load_file filename =
           ("Invalid transaction: too many holes: %s"
           ^ Model.string_of_transaction t)
   in
+  let is_nonempty_transaction (t : Model.transaction) = t.postings <> [] in
   let rec aux filename : Model.t * note list =
     let wd = Filename.dirname filename in
     match Parser.parse_file filename with
@@ -54,11 +55,12 @@ let load_file filename =
                | Model.OpenAccount row ->
                    ({ t with accounts = row :: t.accounts }, notes)
                | Transaction row ->
-                   ( {
-                       t with
-                       transactions = complete_transaction row :: t.transactions;
-                     },
-                     notes )
+                   let row = complete_transaction row in
+                   let transactions =
+                     if is_nonempty_transaction row then row :: t.transactions
+                     else t.transactions
+                   in
+                   ({ t with transactions }, notes)
                | Import { filename; transactions = overlay } ->
                    let filepath = Filename.concat wd filename in
                    let (t' : Model.t), (notes : note list) = aux filepath in
@@ -71,7 +73,8 @@ let load_file filename =
                            t.transactions
                            @ (overlay
                              |> List.map complete_transaction
-                             |> overwrite_transactions t'.transactions);
+                             |> overwrite_transactions t'.transactions
+                             |> List.filter is_nonempty_transaction);
                        },
                        notes )
                | Assert s -> (t, Assert s :: notes)
