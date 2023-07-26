@@ -81,4 +81,5 @@ let load_file filename =
                | Show s -> (t, Show s :: notes))
              ({ accounts = []; transactions = [] }, [])
   in
-  aux filename
+  let model, notes = aux filename in
+  (model, List.rev notes)
