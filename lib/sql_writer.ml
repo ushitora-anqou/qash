@@ -112,7 +112,7 @@ WHERE (t.id IN (SELECT * FROM split_transaction_ids) AND a.name = '%s')
 OR    (t.id NOT IN (SELECT * FROM split_transaction_ids) AND
        t.id IN (SELECT * FROM target_transaction_ids) AND
        a.name <> '%s')
-ORDER BY t.created_at, t.id, p.id
+ORDER BY t.created_at DESC, t.id DESC, p.id DESC
 |}
            account account account account account account account
 
