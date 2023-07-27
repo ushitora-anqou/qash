@@ -103,8 +103,10 @@ let amount_of_string : string -> amount =
   String.split_on_char ',' *> String.concat "" *> int_of_string
 
 let pp_transaction ppf t =
-  Format.fprintf ppf "@[<v 2>* %s %s@,%a@]" (string_of_date t.date)
+  Format.fprintf ppf "@[<v 2>* %s %s%a@,%a@]" (string_of_date t.date)
     ({|"|} ^ t.narration ^ {|"|})
+    (Format.pp_print_list (fun ppf -> Format.fprintf ppf " %s"))
+    t.tags
     (Format.pp_print_list (fun ppf p ->
          Format.fprintf ppf "%s" (string_of_posting p)))
     t.postings
