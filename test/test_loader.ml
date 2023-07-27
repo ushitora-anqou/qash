@@ -7,14 +7,23 @@ let test_overwrite () =
     accounts
     |> List.map (fun (a : Model.open_account) -> a.account |> String.concat ":")
     |> List.sort compare
-    = [ "費用:食費"; "資産:流動資産:ほげ銀行普通預金"; "資産:流動資産:現金"; "資産:立替金" ]);
+    = [
+        "収益:給与";
+        "負債:未払金";
+        "費用:食費";
+        "資本:開始残高";
+        "資産:流動資産:ほげ銀行普通預金";
+        "資産:流動資産:現金";
+        "資産:立替金";
+      ]);
+
   assert (
     transactions
     = Model.
         [
           make_transaction
             ~date:(make_date ~year:2023 ~month:5 ~day:8)
-            ~narration:"コンビニ"
+            ~narration:"コンビニ" ~tags:[ "#タグ1"; "#タグ2" ]
             ~postings:
               [
                 make_posting ~account:[ "資産"; "流動資産"; "現金" ] ~amount:(-502) ();
