@@ -81,10 +81,9 @@ Transactions :
 }
 
 Transaction :
-| STAR date=Date narration=STRING_LIT tags=list(TAG) {
-  Model.make_transaction ~date ~narration ~postings:[] ~tags ()
-}
-| STAR date=Date narration=STRING_LIT tags=list(TAG) INDENT postings=separated_list(BR, Posting) DEDENT {
+| STAR date=Date narration=STRING_LIT tags=list(TAG)
+  postings=option(INDENT ps=separated_list(BR, Posting) DEDENT { ps }) {
+  let postings = Option.value ~default:[] postings in
   Model.make_transaction ~date ~narration ~postings ~tags ()
 }
 
