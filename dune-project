@@ -27,7 +27,9 @@
   caqti-driver-sqlite3
   caqti-lwt
   csv
+  dream
   dune
+  inotify
   jingoo
   logs
   lwt_ppx

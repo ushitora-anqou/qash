@@ -15,7 +15,9 @@ depends: [
   "caqti-driver-sqlite3"
   "caqti-lwt"
   "csv"
+  "dream"
   "dune" {>= "3.8"}
+  "inotify"
   "jingoo"
   "logs"
   "lwt_ppx"
