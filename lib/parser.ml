@@ -94,4 +94,7 @@ let do_parse lex =
 let parse_string s = do_parse (Lexing.from_string s)
 
 let parse_file filename =
-  with_file filename @@ fun ic -> do_parse (Lexing.from_channel ic)
+  with_file filename @@ fun ic ->
+  let lex = Lexing.from_channel ic in
+  Lexing.set_filename lex filename;
+  do_parse lex
