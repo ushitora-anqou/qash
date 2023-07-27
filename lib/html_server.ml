@@ -241,7 +241,7 @@ let jingoo_model_of_transactions account_kind rows =
                       ])) );
        ]
 
-let generate_html' con =
+let generate_ok_html con =
   let%lwt model_gl =
     Store.select_transactions con >|= jingoo_model_of_transactions Model.Asset
   in
@@ -327,11 +327,26 @@ let generate_html' con =
       f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
   |> Lwt.return
 
-let generate_html in_filename =
-  let m, _ = Loader.load_file in_filename in
+let generate_error_html msg =
+  let models = Jingoo.Jg_types.[ ("message", Tstr msg) ] in
+  with_file "lib/error.html.tpl" (fun f ->
+      f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
+  |> Lwt.return
+
+let generate_html' in_filename =
+  let m, notes = Loader.load_file in_filename in
   let%lwt con = Sql_writer.dump "sqlite3::memory:" m in
-  let (module C) = con in
-  Lwt.finalize (fun () -> generate_html' con) (fun () -> C.disconnect ())
+  match%lwt Verifier.verify con notes with
+  | Error s -> failwithf "Verification error: %s" s
+  | Ok () ->
+      let (module C) = con in
+      Lwt.finalize (fun () -> generate_ok_html con) (fun () -> C.disconnect ())
+
+let generate_html in_filename =
+  try%lwt generate_html' in_filename
+  with e ->
+    let message = match e with Failure s -> s | _ -> Printexc.to_string e in
+    generate_error_html message
 
 let start_watching filepath streams =
   let%lwt inotify = Lwt_inotify.create () in
