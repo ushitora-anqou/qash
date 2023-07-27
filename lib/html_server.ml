@@ -335,7 +335,7 @@ let generate_error_html msg =
 
 let generate_html' in_filename =
   let m, notes = Loader.load_file in_filename in
-  let%lwt con = Sql_writer.dump "sqlite3::memory:" m in
+  let%lwt con = Sql_writer.dump_on_memory m in
   match%lwt Verifier.verify con notes with
   | Error s -> failwithf "Verification error: %s" s
   | Ok () ->
