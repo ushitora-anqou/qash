@@ -98,7 +98,7 @@ let of_gnucash_csv transactions_csv_filename =
              | "資本" :: _ -> Equity
              | _ -> Asset
            in
-           Model.make_open_account ~account ~currency:"JPY" ~kind)
+           Model.make_open_account ~account ~currency:"JPY" ~kind ())
   in
 
   (open_accounts |> List.map (fun p -> Model.OpenAccount p))

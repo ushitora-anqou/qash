@@ -78,6 +78,16 @@ CREATE TABLE transaction_tags (
   FOREIGN KEY (tag_id) REFERENCES tags (id)
 )|}
 
+    let create_account_tag =
+      (unit ->. unit)
+        {|
+CREATE TABLE account_tags (
+  account_id INTEGER NOT NULL,
+  tag_id INTEGER NOT NULL,
+  FOREIGN KEY (account_id) REFERENCES accounts (id),
+  FOREIGN KEY (tag_id) REFERENCES tags (id)
+)|}
+
     let create_account_transactions_view account =
       (* FIXME: This query is insecure against SQL injection. *)
       (unit ->. unit)
@@ -135,6 +145,10 @@ ORDER BY t.created_at DESC, t.id DESC, p.id DESC
       (tup2 int int ->. unit)
         {|INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)|}
 
+    let insert_account_tag =
+      (tup2 int int ->. unit)
+        {|INSERT INTO account_tags (account_id, tag_id) VALUES (?, ?)|}
+
     let select_account =
       (tup3 string string (option int) ->? int)
         {|SELECT id FROM accounts WHERE name = ? AND currency = ? AND parent_id IS ?|}
@@ -168,6 +182,9 @@ ORDER BY t.created_at DESC, t.id DESC, p.id DESC
   let create_transaction_tags (module Db : Caqti_lwt.CONNECTION) =
     Db.exec Q.create_transaction_tag () |> raise_if_error
 
+  let create_account_tags (module Db : Caqti_lwt.CONNECTION) =
+    Db.exec Q.create_account_tag () |> raise_if_error
+
   let create_account_transactions_view (module Db : Caqti_lwt.CONNECTION)
       ~account =
     Db.exec (Q.create_account_transactions_view account) () |> raise_if_error
@@ -176,18 +193,19 @@ ORDER BY t.created_at DESC, t.id DESC, p.id DESC
       =
     let parent_id = ref None in
     account
-    |> Lwt_list.iter_s @@ fun name ->
-       let%lwt id =
-         match%lwt
-           Db.find_opt Q.select_account (name, currency, !parent_id)
-           |> raise_if_error
-         with
-         | Some id -> Lwt.return id
-         | None ->
-             Db.find Q.insert_account (name, currency, !parent_id, kind)
-             |> raise_if_error
-       in
-       Lwt.return (parent_id := Some id)
+    |> Lwt_list.iter_s (fun name ->
+           let%lwt id =
+             match%lwt
+               Db.find_opt Q.select_account (name, currency, !parent_id)
+               |> raise_if_error
+             with
+             | Some id -> Lwt.return id
+             | None ->
+                 Db.find Q.insert_account (name, currency, !parent_id, kind)
+                 |> raise_if_error
+           in
+           Lwt.return (parent_id := Some id));%lwt
+    !parent_id |> Option.get |> Lwt.return
 
   let insert_transaction (module Db : Caqti_lwt.CONNECTION) ~date ~narration =
     Db.find Q.insert_transaction (string_of_date date, narration)
@@ -204,6 +222,10 @@ ORDER BY t.created_at DESC, t.id DESC, p.id DESC
   let insert_transaction_tag (module Db : Caqti_lwt.CONNECTION) ~transaction_id
       ~tag_id =
     Db.exec Q.insert_transaction_tag (transaction_id, tag_id) |> raise_if_error
+
+  let insert_account_tag (module Db : Caqti_lwt.CONNECTION) ~account_id ~tag_id
+      =
+    Db.exec Q.insert_account_tag (account_id, tag_id) |> raise_if_error
 
   let select_tag (module Db : Caqti_lwt.CONNECTION) ~name =
     Db.find Q.select_tag name |> raise_if_error
@@ -226,11 +248,21 @@ let dump uri (model : Model.t) =
   Store.create_postings con;%lwt
   Store.create_tags con;%lwt
   Store.create_transaction_tags con;%lwt
+  Store.create_account_tags con;%lwt
 
   (model.accounts
   |> Lwt_list.iter_s @@ fun (acc : Model.open_account) ->
-     Store.insert_account con ~account:acc.account ~currency:acc.currency
-       ~kind:(Model.int_of_account_kind acc.kind));%lwt
+     let%lwt acc_id =
+       Store.insert_account con ~account:acc.account ~currency:acc.currency
+         ~kind:(Model.int_of_account_kind acc.kind)
+     in
+
+     acc.tags
+     |> Lwt_list.map_s (fun name ->
+            try%lwt Store.insert_tag con ~name
+            with _ -> Store.select_tag con ~name)
+     >>= Lwt_list.iter_s (fun tag_id ->
+             Store.insert_account_tag con ~account_id:acc_id ~tag_id));%lwt
 
   Store.create_full_accounts_view con;%lwt
 

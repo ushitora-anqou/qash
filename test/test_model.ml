@@ -4,7 +4,12 @@ let test_yojson () =
   let expected_open_account1 =
     let open Model in
     OpenAccount
-      { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY"; kind = Asset }
+      {
+        account = [ "資産"; "流動資産"; "現金" ];
+        currency = "JPY";
+        kind = Asset;
+        tags = [];
+      }
   in
   let expected_transaction1 =
     let open Model in
@@ -72,7 +77,12 @@ let test_case1 () =
     Model.string_of_directives
       [
         OpenAccount
-          { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY"; kind = Asset };
+          {
+            account = [ "資産"; "流動資産"; "現金" ];
+            currency = "JPY";
+            kind = Asset;
+            tags = [];
+          };
         Transaction
           Model.(
             make_transaction
@@ -117,7 +127,12 @@ let test_case1 () =
     let expected =
       [
         OpenAccount
-          { account = [ "資産"; "流動資産"; "現金" ]; currency = "JPY"; kind = Asset };
+          {
+            account = [ "資産"; "流動資産"; "現金" ];
+            currency = "JPY";
+            kind = Asset;
+            tags = [];
+          };
         Transaction
           Model.(
             make_transaction

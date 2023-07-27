@@ -16,6 +16,11 @@ let test_overwrite () =
         "資産:流動資産:現金";
         "資産:立替金";
       ]);
+  assert (
+    (accounts
+    |> List.find (fun (a : Model.open_account) ->
+           a.account |> String.concat ":" = "資産:流動資産:現金"))
+      .tags = [ "#cash" ]);
 
   assert (
     transactions

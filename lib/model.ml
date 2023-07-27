@@ -66,6 +66,7 @@ type open_account = {
   account : account;
   currency : string;
   kind : account_kind;
+  tags : tag list;
 }
 [@@deriving make, yojson]
 
@@ -115,11 +116,13 @@ let string_of_transaction t =
   Format.asprintf "%a" pp_transaction t |> String.trim
 
 let pp_directive ppf = function
-  | OpenAccount { account; currency; kind } ->
-      Format.fprintf ppf "!open-account %s %s %s\n"
+  | OpenAccount { account; currency; kind; tags } ->
+      Format.fprintf ppf "!open-account %s %s %s%a\n"
         (string_of_account_kind kind)
         (string_of_account account)
         currency
+        (Format.pp_print_list (fun ppf -> Format.fprintf ppf " %s"))
+        tags
   | Transaction t ->
       pp_transaction ppf t;
       Format.pp_print_newline ppf ()

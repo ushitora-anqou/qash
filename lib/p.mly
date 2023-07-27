@@ -33,7 +33,7 @@ Date :
 
 Directive :
 (* !open-account *)
-| K_OPEN_ACCOUNT kind=ID account=Account currency=ID {
+| K_OPEN_ACCOUNT kind=ID account=Account currency=ID tags=list(TAG) {
   Model.OpenAccount {
     account;
     currency;
@@ -47,6 +47,7 @@ Directive :
         | "expense" -> Expense
         | _ -> failwith "invalid account kind"
       );
+    tags;
   }
 }
 | K_IMPORT filename=STRING_LIT {
