@@ -1,6 +1,6 @@
 open Util
 
-type account = string list
+type account = string list [@@deriving show]
 
 let yojson_of_account a = `String (String.concat ":" a)
 
@@ -8,9 +8,9 @@ let account_of_yojson = function
   | `String s -> String.split_on_char ':' s
   | _ -> failwith "account_of_yojson: expected string"
 
-type amount = int [@@deriving yojson]
-type cost = int [@@deriving yojson]
-type price = int [@@deriving yojson]
+type amount = int [@@deriving show, yojson]
+type cost = int [@@deriving show, yojson]
+type price = int [@@deriving show, yojson]
 
 type posting = {
   account : account;
@@ -20,10 +20,12 @@ type posting = {
   narration : string; [@default ""] [@yojson_drop_default ( = )]
   balance : int; [@default 0]
 }
-[@@deriving make, yojson]
+[@@deriving show, make, yojson]
 
-type date = { year : int; month : int; day : int } [@@deriving make, yojson]
-type tag = string [@@deriving yojson]
+type date = { year : int; month : int; day : int }
+[@@deriving show, make, yojson]
+
+type tag = string [@@deriving show, yojson]
 
 type transaction = {
   date : date;
@@ -31,7 +33,7 @@ type transaction = {
   postings : posting list;
   tags : tag list;
 }
-[@@deriving make, yojson]
+[@@deriving show, make, yojson]
 
 type transactions = transaction list [@@deriving yojson]
 
