@@ -17,6 +17,10 @@ rule main = parse
   comment lexbuf;
   main lexbuf
 }
+| "//" {
+  line_comment lexbuf;
+  main lexbuf
+}
 | [ '0'-'9' ][ '0'-'9' ',' ]* as s {
   P.INT_LIT (Model.amount_of_string s)
 }
@@ -40,7 +44,7 @@ rule main = parse
 | '#' [ ^ ' ' '\t' '\n' ]+ as s {
   P.TAG s
 }
-| [ ^ '!' ' ' '\t' '\n' '0'-'9' '-' '(' ')' ] [ ^ ' ' '\t' '\n' ]+ {
+| [ ^ '!' ' ' '\t' '\n' '0'-'9' '-' '(' ')' '/' ] [ ^ ' ' '\t' '\n' ]+ {
   let id = Lexing.lexeme lexbuf in
   P.ID id
 }
@@ -61,4 +65,9 @@ and comment = parse
 }
 | _ {
   comment lexbuf
+}
+
+and line_comment = parse
+| [ ^ '\n' ]* {
+  ()
 }

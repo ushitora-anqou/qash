@@ -17,4 +17,5 @@
     費用:食費            1300
     資産:立替金           202
 
+// コメント
 (*!import "hogehoge.qash"(* nested comment is allowed *)*)
