@@ -102,7 +102,7 @@ let test_case1 () =
       ]
     = String.trim
         {|
-!open-account 資産:流動資産:現金 JPY
+!open-account asset 資産:流動資産:現金 JPY
 
 * 2018-01-01 "Foo"
   資産:流動資産:現金 1000

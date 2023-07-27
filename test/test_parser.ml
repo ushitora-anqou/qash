@@ -3,7 +3,7 @@ open Qash
 let test_case1 () =
   let prog =
     {|
-!open-account 資産:流動資産:現金 JPY
+!open-account asset 資産:流動資産:現金 JPY
 
 * 2014-05-05 "信販C ピヨカ-ドサ-ビ"
   資産:流動資産:ほげ銀行普通預金  -400,000
