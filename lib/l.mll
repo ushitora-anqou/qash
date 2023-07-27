@@ -40,7 +40,7 @@ rule main = parse
 | '#' [ ^ ' ' '\t' '\n' ]+ as s {
   P.TAG s
 }
-| [ ^ '!' ' ' '\t' '\n' '0'-'9' '-' ] [ ^ ' ' '\t' '\n' ]+ {
+| [ ^ '!' ' ' '\t' '\n' '0'-'9' '-' '(' ')' ] [ ^ ' ' '\t' '\n' ]+ {
   let id = Lexing.lexeme lexbuf in
   P.ID id
 }
