@@ -1,3 +1,5 @@
+open Util
+
 type note = Assert of string | Show of string
 
 let load_file filename =
@@ -6,13 +8,16 @@ let load_file filename =
     overlay
     |> List.fold_left
          (fun base (ot : Model.transaction) ->
+           let should_overlay (bt : Model.transaction) =
+             bt.date = ot.date
+             && String.starts_with ~prefix:bt.narration ot.narration
+           in
+           if not (List.exists should_overlay base) then
+             failwithf "transaction to be overlayed not found:\n%s"
+               (Model.string_of_transaction ot);
            base
            |> List.map (fun (bt : Model.transaction) ->
-                  if
-                    bt.date = ot.date
-                    && String.starts_with ~prefix:bt.narration ot.narration
-                  then ot
-                  else bt))
+                  if should_overlay bt then ot else bt))
          base
   in
   let complete_transaction (t : Model.transaction) =
