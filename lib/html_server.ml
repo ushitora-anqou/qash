@@ -138,17 +138,25 @@ INNER JOIN full_accounts a ON al.lifted = a.id
 WHERE a.kind = $2
 |}
 
-    let select_cashflow_in_by_year =
-      (int
-      ->! tup4 int int int
-            (tup4 int int int (tup4 int int int (tup3 int int int))))
+    let select_cashflow_in_by_year_depth =
+      (tup2 int int
+      ->* tup2 string
+            (tup4 int int int
+               (tup4 int int int (tup4 int int int (tup3 int int int)))))
         {|
-WITH const AS (
+WITH RECURSIVE account_lifted (id, depth, lifted) AS (
+    SELECT id, 0, id FROM accounts WHERE parent_id IS NULL
+    UNION ALL
+    SELECT a.id, t.depth + 1, CASE WHEN t.depth + 1 <= $2 THEN a.id ELSE t.lifted END
+    FROM accounts a INNER JOIN account_lifted t ON a.parent_id = t.id
+),
+const AS (
   SELECT
     CAST($1 AS TEXT) AS year,
     CAST($1 + 1 AS TEXT) AS next_year,
     CAST($1 - 1 AS TEXT) AS prev_year
-), cash_account_ids AS (
+),
+cash_account_ids AS (
   SELECT a.id
   FROM accounts a
   INNER JOIN account_tags r ON a.id = r.account_id
@@ -156,20 +164,23 @@ WITH const AS (
   WHERE t.name = '#cash'
 )
 SELECT DISTINCT
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-01-01' <= t.created_at AND t.created_at < c.year     ||'-02-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-02-01' <= t.created_at AND t.created_at < c.year     ||'-03-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-03-01' <= t.created_at AND t.created_at < c.year     ||'-04-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-04-01' <= t.created_at AND t.created_at < c.year     ||'-05-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-05-01' <= t.created_at AND t.created_at < c.year     ||'-06-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-06-01' <= t.created_at AND t.created_at < c.year     ||'-07-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-07-01' <= t.created_at AND t.created_at < c.year     ||'-08-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-08-01' <= t.created_at AND t.created_at < c.year     ||'-09-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-09-01' <= t.created_at AND t.created_at < c.year     ||'-10-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-10-01' <= t.created_at AND t.created_at < c.year     ||'-11-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-11-01' <= t.created_at AND t.created_at < c.year     ||'-12-01' AND p.amount < 0), 0),
-  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-12-01' <= t.created_at AND t.created_at < c.next_year||'-01-01' AND p.amount < 0), 0)
+  a.name,
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-01-01' <= t.created_at AND t.created_at < c.year     ||'-02-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-02-01' <= t.created_at AND t.created_at < c.year     ||'-03-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-03-01' <= t.created_at AND t.created_at < c.year     ||'-04-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-04-01' <= t.created_at AND t.created_at < c.year     ||'-05-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-05-01' <= t.created_at AND t.created_at < c.year     ||'-06-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-06-01' <= t.created_at AND t.created_at < c.year     ||'-07-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-07-01' <= t.created_at AND t.created_at < c.year     ||'-08-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-08-01' <= t.created_at AND t.created_at < c.year     ||'-09-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-09-01' <= t.created_at AND t.created_at < c.year     ||'-10-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-10-01' <= t.created_at AND t.created_at < c.year     ||'-11-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-11-01' <= t.created_at AND t.created_at < c.year     ||'-12-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-12-01' <= t.created_at AND t.created_at < c.next_year||'-01-01' AND p.amount < 0) OVER ( PARTITION BY al.lifted ), 0)
 FROM postings p, const c
 INNER JOIN transactions t ON p.transaction_id = t.id
+INNER JOIN account_lifted al ON p.account_id = al.id
+INNER JOIN full_accounts a ON al.lifted = a.id
 WHERE p.account_id NOT IN ( SELECT * FROM cash_account_ids )
 AND EXISTS (
   SELECT * FROM postings p1
@@ -178,17 +189,25 @@ AND EXISTS (
 )
 |}
 
-    let select_cashflow_out_by_year =
-      (int
-      ->! tup4 int int int
-            (tup4 int int int (tup4 int int int (tup3 int int int))))
+    let select_cashflow_out_by_year_depth =
+      (tup2 int int
+      ->* tup2 string
+            (tup4 int int int
+               (tup4 int int int (tup4 int int int (tup3 int int int)))))
         {|
-WITH const AS (
+WITH RECURSIVE account_lifted (id, depth, lifted) AS (
+    SELECT id, 0, id FROM accounts WHERE parent_id IS NULL
+    UNION ALL
+    SELECT a.id, t.depth + 1, CASE WHEN t.depth + 1 <= $2 THEN a.id ELSE t.lifted END
+    FROM accounts a INNER JOIN account_lifted t ON a.parent_id = t.id
+),
+const AS (
   SELECT
     CAST($1 AS TEXT) AS year,
     CAST($1 + 1 AS TEXT) AS next_year,
     CAST($1 - 1 AS TEXT) AS prev_year
-), cash_account_ids AS (
+),
+cash_account_ids AS (
   SELECT a.id
   FROM accounts a
   INNER JOIN account_tags r ON a.id = r.account_id
@@ -196,20 +215,23 @@ WITH const AS (
   WHERE t.name = '#cash'
 )
 SELECT DISTINCT
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-01-01' <= t.created_at AND t.created_at < c.year     ||'-02-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-02-01' <= t.created_at AND t.created_at < c.year     ||'-03-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-03-01' <= t.created_at AND t.created_at < c.year     ||'-04-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-04-01' <= t.created_at AND t.created_at < c.year     ||'-05-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-05-01' <= t.created_at AND t.created_at < c.year     ||'-06-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-06-01' <= t.created_at AND t.created_at < c.year     ||'-07-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-07-01' <= t.created_at AND t.created_at < c.year     ||'-08-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-08-01' <= t.created_at AND t.created_at < c.year     ||'-09-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-09-01' <= t.created_at AND t.created_at < c.year     ||'-10-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-10-01' <= t.created_at AND t.created_at < c.year     ||'-11-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-11-01' <= t.created_at AND t.created_at < c.year     ||'-12-01' AND p.amount > 0), 0),
-  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-12-01' <= t.created_at AND t.created_at < c.next_year||'-01-01' AND p.amount > 0), 0)
+  a.name,
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-01-01' <= t.created_at AND t.created_at < c.year     ||'-02-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-02-01' <= t.created_at AND t.created_at < c.year     ||'-03-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-03-01' <= t.created_at AND t.created_at < c.year     ||'-04-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-04-01' <= t.created_at AND t.created_at < c.year     ||'-05-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-05-01' <= t.created_at AND t.created_at < c.year     ||'-06-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-06-01' <= t.created_at AND t.created_at < c.year     ||'-07-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-07-01' <= t.created_at AND t.created_at < c.year     ||'-08-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-08-01' <= t.created_at AND t.created_at < c.year     ||'-09-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-09-01' <= t.created_at AND t.created_at < c.year     ||'-10-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-10-01' <= t.created_at AND t.created_at < c.year     ||'-11-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-11-01' <= t.created_at AND t.created_at < c.year     ||'-12-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-12-01' <= t.created_at AND t.created_at < c.next_year||'-01-01' AND p.amount > 0) OVER ( PARTITION BY al.lifted ), 0)
 FROM postings p, const c
 INNER JOIN transactions t ON p.transaction_id = t.id
+INNER JOIN account_lifted al ON p.account_id = al.id
+INNER JOIN full_accounts a ON al.lifted = a.id
 WHERE p.account_id NOT IN ( SELECT * FROM cash_account_ids )
 AND EXISTS (
   SELECT * FROM postings p1
@@ -277,11 +299,15 @@ AND EXISTS (
       (depth, account, year) []
     |> raise_if_error
 
-  let select_cashflow_in_by_year (module Db : Caqti_lwt.CONNECTION) ~year =
-    Db.find Q.select_cashflow_in_by_year year |> raise_if_error
+  let select_cashflow_in_by_year_depth (module Db : Caqti_lwt.CONNECTION) ~year
+      ~depth =
+    Db.fold Q.select_cashflow_in_by_year_depth List.cons (year, depth) []
+    |> raise_if_error
 
-  let select_cashflow_out_by_year (module Db : Caqti_lwt.CONNECTION) ~year =
-    Db.find Q.select_cashflow_out_by_year year |> raise_if_error
+  let select_cashflow_out_by_year_depth (module Db : Caqti_lwt.CONNECTION) ~year
+      ~depth =
+    Db.fold Q.select_cashflow_out_by_year_depth List.cons (year, depth) []
+    |> raise_if_error
 end
 
 let jingoo_model_of_transactions account_kind rows =
@@ -352,10 +378,18 @@ let format_monthly_data_for_jingoo year raw_data =
   let labels = get_monthly_labels year in
   let data =
     raw_data
-    |> List.map (fun (account_name, data) ->
-           (account_name, Tlist (data |> List.map (fun x -> Tint x))))
+    |> List.filter_map @@ fun (account_name, stack, data) ->
+       if data |> List.for_all (( = ) 0) then None
+       else
+         Tobj
+           [
+             ("account", Tstr account_name);
+             ("stack", Tstr stack);
+             ("data", Tlist (data |> List.map (fun x -> Tint x)));
+           ]
+         |> Option.some
   in
-  Tobj [ ("labels", Tlist labels); ("data", Tobj data) ]
+  Tobj [ ("labels", Tlist labels); ("data", Tlist data) ]
 
 let get_models_asset_liability_expense_income ~depth ~year con =
   let get_raw_data ~account ~depth ~year kind column =
@@ -372,7 +406,7 @@ let get_models_asset_liability_expense_income ~depth ~year con =
     let aux x = match column with `Debt -> x | `Credit -> -x in
     raw_data
     |> List.map (fun (account_name, data) ->
-           (account_name, data |> decode_monthly_data |> List.map aux))
+           (account_name, "default", data |> decode_monthly_data |> List.map aux))
     |> Lwt.return
   in
   let%lwt asset =
@@ -393,18 +427,36 @@ let get_models_asset_liability_expense_income ~depth ~year con =
   in
   Lwt.return (asset, liability, expense, income)
 
-let get_model_cashflow con year =
+let get_model_cashflow ~year ~depth con =
   let%lwt cashflow_in =
-    Store.select_cashflow_in_by_year con ~year >|= decode_monthly_data
+    Store.select_cashflow_in_by_year_depth ~year ~depth con
+    >|= List.map (fun (account, data) ->
+            (account, "in", decode_monthly_data data))
   in
   let%lwt cashflow_out =
-    Store.select_cashflow_out_by_year con ~year >|= decode_monthly_data
+    Store.select_cashflow_out_by_year_depth ~year ~depth con
+    >|= List.map (fun (account, data) ->
+            (account, "out", decode_monthly_data data))
   in
   let cashflow =
-    List.combine cashflow_in cashflow_out |> List.map (fun (x, y) -> x - y)
+    let sum_in =
+      cashflow_in
+      |> List.fold_left
+           (fun acc (_, _, xs) ->
+             List.combine acc xs |> List.map (fun (x, y) -> x + y))
+           [ 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0 ]
+    in
+    let sum_out =
+      cashflow_out
+      |> List.fold_left
+           (fun acc (_, _, xs) ->
+             List.combine acc xs |> List.map (fun (x, y) -> x + y))
+           [ 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0 ]
+    in
+    List.combine sum_in sum_out |> List.map (fun (x, y) -> x - y)
   in
-  [ ("in", cashflow_in); ("out", cashflow_out); ("net", cashflow) ]
-  |> format_monthly_data_for_jingoo year
+  format_monthly_data_for_jingoo year
+    (cashflow_in @ cashflow_out @ [ ("net", "net", cashflow) ])
   |> Lwt.return
 
 let generate_ok_html con =
@@ -415,7 +467,7 @@ let generate_ok_html con =
   let%lwt model_asset, model_liability, model_expense, model_income =
     get_models_asset_liability_expense_income ~depth ~year con
   in
-  let%lwt model_cashflow = get_model_cashflow con year in
+  let%lwt model_cashflow = get_model_cashflow ~year ~depth con in
 
   let models =
     [

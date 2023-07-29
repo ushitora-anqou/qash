@@ -11,12 +11,13 @@ new Chart(document.getElementById('{{ canvas_id }}'), {
 {%- endfor -%}
     ],
     datasets: [
-{%- for account, data in rows.data -%}
+{%- for ent in rows.data -%}
       {
-        label: '{{ account }}',
-        data: [{{ data | join(', ') }}],
+        label: '{{ ent.account }}',
+        data: [{{ ent.data | join(', ') }}],
         borderWidth: 1,
         backgroundColor: colors[{{ loop.index0 }} % colors.length],
+        stack: '{{ ent.stack }}',
       },
 {%- endfor -%}
     ]
@@ -168,7 +169,7 @@ socket.addEventListener("message", function(event) {
 <h2>費用チャート</h2>
 {{ bars_table ("expense-2023", expense, true) }}
 <h2>キャシュフロー</h2>
-{{ bars_table ("cashflow-2023", cashflow, false) }}
+{{ bars_table ("cashflow-2023", cashflow, true) }}
 <div>
 </div>
 </div>
