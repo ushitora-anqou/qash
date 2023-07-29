@@ -139,6 +139,9 @@ let serve =
   in
   Html_server.serve ~interface ~port
 
+let generate num_entries =
+  Generator.generate_sample num_entries |> print_endline
+
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());
   Logs.set_level (Some Logs.Debug);
@@ -179,6 +182,11 @@ let () =
                 required & pos 0 (some string) None & info ~docv:"IN-FILE" [])
             $ Arg.(
                 required & pos 1 (some string) None & info ~docv:"OUT-FILE" []));
+        v (info "generate")
+          Term.(
+            const generate
+            $ Arg.(
+                required & pos 0 (some int) None & info ~docv:"NUM-ENTRIES" []));
       ]
     |> eval)
   |> exit
