@@ -106,15 +106,17 @@ let of_gnucash_csv transactions_csv_filename =
   |> Model.string_of_directives |> print_endline
 
 let check filename =
-  let m, notes = Loader.load_file filename in
-  match
-    Lwt_main.run
-      (Sql_writer.dump_on_memory m >>= fun con -> Verifier.verify con notes)
-  with
-  | Ok () ->
-      Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
-        (List.length m.transactions)
-  | Error e -> Printf.eprintf "Error: %s\n" e
+  try
+    let m, notes = Loader.load_file filename in
+    match
+      Lwt_main.run
+        (Sql_writer.dump_on_memory m >>= fun con -> Verifier.verify con notes)
+    with
+    | Ok () ->
+        Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
+          (List.length m.transactions)
+    | Error e -> Printf.eprintf "Error: %s\n" e
+  with Failure s -> Printf.eprintf "Error: %s\n" s
 
 let dump in_filename out_filename =
   let m, _ = Loader.load_file in_filename in
