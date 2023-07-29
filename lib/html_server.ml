@@ -137,6 +137,86 @@ INNER JOIN account_lifted al ON p.account_id = al.id
 INNER JOIN full_accounts a ON al.lifted = a.id
 WHERE a.kind = $2
 |}
+
+    let select_cashflow_in_by_year =
+      (int
+      ->! tup4 int int int
+            (tup4 int int int (tup4 int int int (tup3 int int int))))
+        {|
+WITH const AS (
+  SELECT
+    CAST($1 AS TEXT) AS year,
+    CAST($1 + 1 AS TEXT) AS next_year,
+    CAST($1 - 1 AS TEXT) AS prev_year
+), cash_account_ids AS (
+  SELECT a.id
+  FROM accounts a
+  INNER JOIN account_tags r ON a.id = r.account_id
+  INNER JOIN tags t ON r.tag_id = t.id
+  WHERE t.name = '#cash'
+)
+SELECT DISTINCT
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-01-01' <= t.created_at AND t.created_at < c.year     ||'-02-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-02-01' <= t.created_at AND t.created_at < c.year     ||'-03-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-03-01' <= t.created_at AND t.created_at < c.year     ||'-04-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-04-01' <= t.created_at AND t.created_at < c.year     ||'-05-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-05-01' <= t.created_at AND t.created_at < c.year     ||'-06-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-06-01' <= t.created_at AND t.created_at < c.year     ||'-07-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-07-01' <= t.created_at AND t.created_at < c.year     ||'-08-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-08-01' <= t.created_at AND t.created_at < c.year     ||'-09-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-09-01' <= t.created_at AND t.created_at < c.year     ||'-10-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-10-01' <= t.created_at AND t.created_at < c.year     ||'-11-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-11-01' <= t.created_at AND t.created_at < c.year     ||'-12-01' AND p.amount < 0), 0),
+  -COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-12-01' <= t.created_at AND t.created_at < c.next_year||'-01-01' AND p.amount < 0), 0)
+FROM postings p, const c
+INNER JOIN transactions t ON p.transaction_id = t.id
+WHERE p.account_id NOT IN ( SELECT * FROM cash_account_ids )
+AND EXISTS (
+  SELECT * FROM postings p1
+  WHERE p1.transaction_id = p.transaction_id
+  AND p1.account_id IN ( SELECT * FROM cash_account_ids )
+)
+|}
+
+    let select_cashflow_out_by_year =
+      (int
+      ->! tup4 int int int
+            (tup4 int int int (tup4 int int int (tup3 int int int))))
+        {|
+WITH const AS (
+  SELECT
+    CAST($1 AS TEXT) AS year,
+    CAST($1 + 1 AS TEXT) AS next_year,
+    CAST($1 - 1 AS TEXT) AS prev_year
+), cash_account_ids AS (
+  SELECT a.id
+  FROM accounts a
+  INNER JOIN account_tags r ON a.id = r.account_id
+  INNER JOIN tags t ON r.tag_id = t.id
+  WHERE t.name = '#cash'
+)
+SELECT DISTINCT
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-01-01' <= t.created_at AND t.created_at < c.year     ||'-02-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-02-01' <= t.created_at AND t.created_at < c.year     ||'-03-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-03-01' <= t.created_at AND t.created_at < c.year     ||'-04-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-04-01' <= t.created_at AND t.created_at < c.year     ||'-05-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-05-01' <= t.created_at AND t.created_at < c.year     ||'-06-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-06-01' <= t.created_at AND t.created_at < c.year     ||'-07-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-07-01' <= t.created_at AND t.created_at < c.year     ||'-08-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-08-01' <= t.created_at AND t.created_at < c.year     ||'-09-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-09-01' <= t.created_at AND t.created_at < c.year     ||'-10-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-10-01' <= t.created_at AND t.created_at < c.year     ||'-11-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-11-01' <= t.created_at AND t.created_at < c.year     ||'-12-01' AND p.amount > 0), 0),
+  COALESCE(SUM(p.amount) FILTER (WHERE c.year||'-12-01' <= t.created_at AND t.created_at < c.next_year||'-01-01' AND p.amount > 0), 0)
+FROM postings p, const c
+INNER JOIN transactions t ON p.transaction_id = t.id
+WHERE p.account_id NOT IN ( SELECT * FROM cash_account_ids )
+AND EXISTS (
+  SELECT * FROM postings p1
+  WHERE p1.transaction_id = p.transaction_id
+  AND p1.account_id IN ( SELECT * FROM cash_account_ids )
+)
+|}
   end
 
   let raise_if_error f =
@@ -196,6 +276,12 @@ WHERE a.kind = $2
     Db.fold Q.select_sum_amount_by_depth_account_year List.cons
       (depth, account, year) []
     |> raise_if_error
+
+  let select_cashflow_in_by_year (module Db : Caqti_lwt.CONNECTION) ~year =
+    Db.find Q.select_cashflow_in_by_year year |> raise_if_error
+
+  let select_cashflow_out_by_year (module Db : Caqti_lwt.CONNECTION) ~year =
+    Db.find Q.select_cashflow_out_by_year year |> raise_if_error
 end
 
 let jingoo_model_of_transactions account_kind rows =
@@ -241,20 +327,38 @@ let jingoo_model_of_transactions account_kind rows =
                       ])) );
        ]
 
-let generate_ok_html con =
-  let%lwt model_gl =
-    Store.select_transactions con >|= jingoo_model_of_transactions Model.Asset
-  in
+let get_model_gl con =
+  Store.select_transactions con >|= jingoo_model_of_transactions Model.Asset
+  >|= fun x -> Jingoo.Jg_types.Tlist x
 
-  let%lwt model_accounts =
-    Store.select_accounts con
-    >>= Lwt_list.map_s (fun (account, kind) ->
-            Store.select_account_transactions con account
-            >|= jingoo_model_of_transactions (Model.account_kind_of_int kind)
-            >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
-  in
+let get_model_accounts con =
+  Store.select_accounts con
+  >>= Lwt_list.map_s (fun (account, kind) ->
+          Store.select_account_transactions con account
+          >|= jingoo_model_of_transactions (Model.account_kind_of_int kind)
+          >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
+  >|= fun x -> Jingoo.Jg_types.Tobj x
 
-  let get_model ~account ~depth ~year kind column =
+let decode_monthly_data
+    (jan, feb, mar, (apr, may, jun, (jul, aug, sep, (oct, nov, dec)))) =
+  [ jan; feb; mar; apr; may; jun; jul; aug; sep; oct; nov; dec ]
+
+let format_monthly_data_for_jingoo year raw_data =
+  let open Jingoo.Jg_types in
+  let get_monthly_labels year =
+    iota 12
+    |> List.map (fun i -> Tstr (Printf.sprintf "%d-%02d-01" year (i + 1)))
+  in
+  let labels = get_monthly_labels year in
+  let data =
+    raw_data
+    |> List.map (fun (account_name, data) ->
+           (account_name, Tlist (data |> List.map (fun x -> Tint x))))
+  in
+  Tobj [ ("labels", Tlist labels); ("data", Tobj data) ]
+
+let get_models_asset_liability_expense_income ~depth ~year con =
+  let get_raw_data ~account ~depth ~year kind column =
     let account = Model.int_of_account_kind account in
     let%lwt raw_data =
       match kind with
@@ -265,63 +369,64 @@ let generate_ok_html con =
           Store.select_sum_amount_by_depth_account_year con ~depth ~account
             ~year
     in
-    let open Jingoo.Jg_types in
-    let labels =
-      iota 12
-      |> List.map (fun i -> Tstr (Printf.sprintf "%d-%02d-01" year (i + 1)))
-    in
-    let data =
-      raw_data
-      |> List.map
-           (fun
-             ( account_name,
-               (jan, feb, mar, (apr, may, jun, (jul, aug, sep, (oct, nov, dec))))
-             )
-           ->
-             let aux x = match column with `Debt -> x | `Credit -> -x in
-             ( account_name,
-               Tlist
-                 [
-                   Tint (aux jan);
-                   Tint (aux feb);
-                   Tint (aux mar);
-                   Tint (aux apr);
-                   Tint (aux may);
-                   Tint (aux jun);
-                   Tint (aux jul);
-                   Tint (aux aug);
-                   Tint (aux sep);
-                   Tint (aux oct);
-                   Tint (aux nov);
-                   Tint (aux dec);
-                 ] ))
-    in
-    Lwt.return (Tobj [ ("labels", Tlist labels); ("data", Tobj data) ])
+    let aux x = match column with `Debt -> x | `Credit -> -x in
+    raw_data
+    |> List.map (fun (account_name, data) ->
+           (account_name, data |> decode_monthly_data |> List.map aux))
+    |> Lwt.return
   in
+  let%lwt asset =
+    get_raw_data ~account:Asset ~depth ~year `Stock `Debt
+    >|= format_monthly_data_for_jingoo year
+  in
+  let%lwt liability =
+    get_raw_data ~account:Liability ~depth ~year `Stock `Credit
+    >|= format_monthly_data_for_jingoo year
+  in
+  let%lwt expense =
+    get_raw_data ~account:Expense ~depth ~year `Flow `Debt
+    >|= format_monthly_data_for_jingoo year
+  in
+  let%lwt income =
+    get_raw_data ~account:Income ~depth ~year `Flow `Credit
+    >|= format_monthly_data_for_jingoo year
+  in
+  Lwt.return (asset, liability, expense, income)
 
-  let%lwt model_asset =
-    get_model ~account:Asset ~depth:1 ~year:2023 `Stock `Debt
+let get_model_cashflow con year =
+  let%lwt cashflow_in =
+    Store.select_cashflow_in_by_year con ~year >|= decode_monthly_data
   in
-  let%lwt model_liability =
-    get_model ~account:Liability ~depth:1 ~year:2023 `Stock `Credit
+  let%lwt cashflow_out =
+    Store.select_cashflow_out_by_year con ~year >|= decode_monthly_data
   in
-  let%lwt model_expense =
-    get_model ~account:Expense ~depth:1 ~year:2023 `Flow `Debt
+  let cashflow =
+    List.combine cashflow_in cashflow_out |> List.map (fun (x, y) -> x - y)
   in
-  let%lwt model_income =
-    get_model ~account:Income ~depth:1 ~year:2023 `Flow `Credit
+  [ ("in", cashflow_in); ("out", cashflow_out); ("net", cashflow) ]
+  |> format_monthly_data_for_jingoo year
+  |> Lwt.return
+
+let generate_ok_html con =
+  let year = 2023 in
+  let depth = 1 in
+  let%lwt model_gl = get_model_gl con in
+  let%lwt model_accounts = get_model_accounts con in
+  let%lwt model_asset, model_liability, model_expense, model_income =
+    get_models_asset_liability_expense_income ~depth ~year con
   in
+  let%lwt model_cashflow = get_model_cashflow con year in
 
   let models =
-    Jingoo.Jg_types.
-      [
-        ("gl", Tlist model_gl);
-        ("account", Tobj model_accounts);
-        ("asset", model_asset);
-        ("liability", model_liability);
-        ("expense", model_expense);
-        ("income", model_income);
-      ]
+    [
+      ("gl", model_gl);
+      ("account", model_accounts);
+      ("asset", model_asset);
+      ("liability", model_liability);
+      ("expense", model_expense);
+      ("income", model_income);
+      ("cashflow", model_cashflow);
+    ]
   in
   with_file "lib/index.html.tpl" (fun f ->
       f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)

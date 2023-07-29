@@ -1,4 +1,4 @@
-{%- macro bars_table (canvas_id, rows) -%}
+{%- macro bars_table (canvas_id, rows, stacked) -%}
 <div>
 <canvas id="{{ canvas_id }}" width=1000 height=600></canvas>
 <script>
@@ -24,11 +24,11 @@ new Chart(document.getElementById('{{ canvas_id }}'), {
   options: {
     scales: {
       x: {
-        stacked: true,
+        stacked: {{ stacked }},
       },
       y: {
         beginAtZero: true,
-        stacked: true
+        stacked: {{ stacked }},
       }
     }
   }
@@ -160,13 +160,17 @@ socket.addEventListener("message", function(event) {
 <input type="radio" id="charts" name="tab" />
 <div>
 <h2>資産チャート</h2>
-{{ bars_table ("asset-2023", asset) }}
+{{ bars_table ("asset-2023", asset, true) }}
 <h2>負債チャート</h2>
-{{ bars_table ("liability-2023", liability) }}
+{{ bars_table ("liability-2023", liability, true) }}
 <h2>収益チャート</h2>
-{{ bars_table ("income-2023", income) }}
+{{ bars_table ("income-2023", income, true) }}
 <h2>費用チャート</h2>
-{{ bars_table ("expense-2023", expense) }}
+{{ bars_table ("expense-2023", expense, true) }}
+<h2>キャシュフロー</h2>
+{{ bars_table ("cashflow-2023", cashflow, false) }}
+<div>
+</div>
 </div>
 {%- for account, rows in account -%}
 {%- if length(rows) != 0 -%}
