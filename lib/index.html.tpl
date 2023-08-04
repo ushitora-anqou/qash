@@ -168,7 +168,7 @@ socket.addEventListener("message", function(event) {
 {{ bars_table ("income-2023", income, true) }}
 <h2>費用チャート</h2>
 {{ bars_table ("expense-2023", expense, true) }}
-<h2>キャシュフロー</h2>
+<h2>キャッシュフロー</h2>
 {{ bars_table ("cashflow-2023", cashflow, true) }}
 <div>
 </div>
