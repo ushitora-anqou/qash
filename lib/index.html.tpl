@@ -68,69 +68,34 @@ new Chart(document.getElementById('{{ canvas_id }}'), {
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<script src='https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.3.4/react-router-dom.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.9/babel.min.js'></script>
 <style>
-* {
-  max-width: 95%;
-  margin: 20px auto;
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
 }
-table.transactions .col-date {
-  width: 10vw;
+.sidebar {
+  width: 20%;
+  padding: 1em;
 }
-table.transactions .col-narration {
-  width: 50vw;
+.content {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
 }
-table.transactions .col-account {
-  width: 10vw;
-  text-align: right;
-  white-space: nowrap;
-  overflow: auto;
-}
-table.transactions .col-debit {
-  width: 10vw;
-  text-align: right;
-}
-table.transactions .col-credit {
-  width: 10vw;
+.amount {
   text-align: right;
 }
-table.transactions .col-balance {
-  width: 10vw;
-  text-align: right;
-}
-table.transactions td.number {
-  text-align: right;
-}
-table.transactions thead tr, table.transactions thead td {
-  background-color: #96b183;
-  border: 2px solid black;
-  font-weight: bold;
-}
-table.transactions tbody tr:nth-child(even) {
-  background-color: #f6ffda;
-}
-table.transactions tbody tr:nth-child(odd) {
-  background-color: #bfdeb9;
-}
-table.transactions, table.transactions th, table.transactions td {
+.account {
   border: 1px solid black;
-  border-collapse: collapse;
   padding: 5px;
-  color: #000000;
-}
-.switchtab > input {
-  display: none;
-}
-.switchtab > label {
-  display: inline-block;
   margin: 5px;
-  padding: 10px;
-  background-color: #f6ffda;
-}
-.switchtab > input:checked + div {
-    display: block;
-}
-.switchtab > div {
-    display: none;
 }
 </style>
 <title>Qash</title>
@@ -149,7 +114,63 @@ socket.addEventListener("message", function(event) {
 </head>
 <body>
 <h1>Qash</h1>
+<div id='root'></div>
 
+<script type='text/babel'>
+const Link = ReactRouterDOM.Link;
+const Route = ReactRouterDOM.Route;
+
+function PageGL() {
+  return <h1>総勘定元帳</h1>;
+}
+function PageCharts() {
+  return <h1>チャート</h1>;
+}
+{% for account, rows in account -%}
+{%- if length(rows) != 0 -%}
+function Page{{ loop.index }}() {
+  return <h1>{{ account }}</h1>;
+}
+{% endif -%}
+{% endfor -%}
+
+const App = () => (
+  <ReactRouterDOM.HashRouter>
+    <div class="app">
+      <div class="sidebar">
+        <div><Link to="/">総勘定元帳</Link></div>
+        <div><Link to="/charts">チャート</Link></div>
+
+{% for account, rows in account -%}
+{%- if length(rows) != 0 %}
+        <Link to="/account/{{ account | replace(':', '_') }}">
+          <div class="account">
+            <div>{{ account }}</div>
+            <div class="amount">{{ rows[0].postings[0].balance_s }} JPY</div>
+          </div>
+        </Link>
+{% endif -%}
+{% endfor -%}
+      </div>
+
+      <div class="content">
+        <Route path="/" exact component={PageGL} />
+        <Route path="/charts" exact component={PageCharts} />
+
+{%- for account, rows in account -%}
+{%- if length(rows) != 0 -%}
+        <Route path="/account/{{ account | replace(':', '_') }}" exact component={Page{{ loop.index }}} />
+{%- endif -%}
+{% endfor -%}
+      </div>
+    </div>
+  </ReactRouterDOM.HashRouter>
+)
+
+ReactDOM.render(<App />, document.querySelector('#root'));
+</script>
+
+<!--
 <div class="switchtab">
 <label for="gl">総勘定元帳</label>
 <label for="charts">チャート</label>
@@ -188,5 +209,6 @@ socket.addEventListener("message", function(event) {
 {{ transaction_table (gl) }}
 </div>
 </div>
+-->
 </body>
 </html>
