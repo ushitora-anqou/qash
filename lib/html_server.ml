@@ -459,17 +459,14 @@ let get_model_cashflow ~year ~depth con =
     (cashflow_in @ cashflow_out @ [ ("net", "net", cashflow) ])
   |> Lwt.return
 
-let generate_ok_html con =
-  let year = 2023 in
-  let depth = 1 in
+let get_models ~year ~depth con =
   let%lwt model_gl = get_model_gl con in
   let%lwt model_accounts = get_model_accounts con in
   let%lwt model_asset, model_liability, model_expense, model_income =
     get_models_asset_liability_expense_income ~depth ~year con
   in
   let%lwt model_cashflow = get_model_cashflow ~year ~depth con in
-
-  let models =
+  Lwt.return
     [
       ("gl", model_gl);
       ("account", model_accounts);
@@ -479,7 +476,9 @@ let generate_ok_html con =
       ("income", model_income);
       ("cashflow", model_cashflow);
     ]
-  in
+
+let generate_ok_html con =
+  let%lwt models = get_models ~year:2023 ~depth:1 con in
   with_file "lib/index.html.tpl" (fun f ->
       f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
   |> Lwt.return
@@ -490,20 +489,45 @@ let generate_error_html msg =
       f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
   |> Lwt.return
 
-let generate_html' in_filename =
+let generate in_filename thn err =
   let m, notes = Loader.load_file in_filename in
   let%lwt con = Sql_writer.dump_on_memory m in
   match%lwt Verifier.verify con notes with
   | Error s -> failwithf "Verification error: %s" s
-  | Ok () ->
+  | Ok () -> (
       let (module C) = con in
-      Lwt.finalize (fun () -> generate_ok_html con) (fun () -> C.disconnect ())
+      try%lwt Lwt.finalize (fun () -> thn con) (fun () -> C.disconnect ())
+      with e ->
+        let message =
+          match e with Failure s -> s | _ -> Printexc.to_string e
+        in
+        err message)
 
 let generate_html in_filename =
-  try%lwt generate_html' in_filename
-  with e ->
-    let message = match e with Failure s -> s | _ -> Printexc.to_string e in
-    generate_error_html message
+  generate in_filename generate_ok_html generate_error_html
+
+let generate_json in_filename =
+  let yojson_of_jingoo_model =
+    let open Jingoo.Jg_types in
+    let rec aux = function
+      | Tint i -> `Int i
+      | Tfloat f -> `Float f
+      | Tbool b -> `Bool b
+      | Tstr s -> `String s
+      | Tnull -> `Null
+      | Tlist xs -> `List (List.map aux xs)
+      | Tobj xs -> `Assoc (List.map (fun (k, v) -> (k, aux v)) xs)
+      | _ -> failwith "yojson_of_jingoo_model: unsupported type"
+    in
+    aux
+  in
+  let aux_ok con =
+    get_models ~year:2023 ~depth:1 con
+    >|= List.map (fun (k, v) -> (k, yojson_of_jingoo_model v))
+    >|= fun xs -> `Assoc xs
+  in
+  let aux_err msg = `Assoc [ ("error", `String msg) ] |> Lwt.return in
+  generate in_filename aux_ok aux_err
 
 let start_watching filepath streams =
   let%lwt inotify = Lwt_inotify.create () in
@@ -544,6 +568,9 @@ let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
            ( Dream.get "/" @@ fun _ ->
              let%lwt html = generate_html in_filename in
              Dream.html html );
+           ( Dream.get "/data.json" @@ fun _ ->
+             generate_json in_filename >|= Yojson.to_string
+             >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
          ]
   in
   Lwt_main.run f
