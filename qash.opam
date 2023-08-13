@@ -17,7 +17,7 @@ depends: [
   "csv"
   "dream"
   "dune" {>= "3.8"}
-  "inotify"
+  "inotify" {"os" = "linux"}
   "jingoo"
   "logs"
   "lwt_ppx"

@@ -9,4 +9,4 @@
  (name qash)
  (preprocess
   (pps lwt_ppx ppx_deriving.make ppx_deriving.show ppx_yojson_conv))
- (libraries caqti-lwt caqti-driver-sqlite3 csv pcre jingoo dream inotify.lwt))
+ (libraries caqti-lwt caqti-driver-sqlite3 csv pcre jingoo dream fsnotify))

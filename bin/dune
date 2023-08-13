@@ -3,4 +3,6 @@
  (name main)
  (preprocess
   (pps lwt_ppx))
- (libraries qash cmdliner yojson logs logs.fmt))
+ (libraries qash cmdliner yojson logs logs.fmt fsnotify_linux)
+ (enabled_if
+  (= %{system} linux)))

@@ -519,19 +519,13 @@ let generate_json in_filename =
   generate in_filename aux_ok aux_err
 
 let start_watching filepath streams =
-  let%lwt inotify = Lwt_inotify.create () in
-  let rec loop () =
-    try%lwt
-      Lwt_inotify.add_watch inotify filepath Inotify.[ S_Modify ] |> ignore_lwt;%lwt
-      let%lwt _, _events, _, _ = Lwt_inotify.read inotify in
-      Dream.info (fun m -> m "File updated");
-      !streams |> Lwt_list.iter_p (fun stream -> Dream.send stream "reload");%lwt
-      loop ()
-    with e ->
-      Dream.error (fun m -> m "Watching error: %s" (Printexc.to_string e));
-      Lwt.return_unit
-  in
-  Lwt.return @@ Lwt.async loop
+  try%lwt
+    Fsnotify.start_watching ~filepath (fun _ ->
+        Dream.info (fun m -> m "File updated");
+        !streams |> Lwt_list.iter_p (fun stream -> Dream.send stream "reload"))
+  with Failure s ->
+    Dream.error (fun m -> m "Watching error: %s" s);
+    Lwt.return_unit
 
 let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
   let streams = ref [] in

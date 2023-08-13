@@ -1,0 +1,4 @@
+(library
+ (name fsnotify)
+ (virtual_modules fsnotify)
+ (libraries lwt))

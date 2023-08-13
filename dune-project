@@ -29,7 +29,8 @@
   csv
   dream
   dune
-  inotify
+  (inotify
+   (= os linux))
   jingoo
   logs
   lwt_ppx
