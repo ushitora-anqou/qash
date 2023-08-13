@@ -6,7 +6,7 @@ module Store = struct
     open Caqti_request.Infix
     open Caqti_type.Std
 
-    let select_account_transactions =
+    let select_split_account_transactions =
       (string ->* tup3 int string (tup4 string string string (tup2 int int)))
         {|
 WITH target_transaction_ids AS (
@@ -14,26 +14,13 @@ WITH target_transaction_ids AS (
   FROM postings p
   INNER JOIN full_accounts a ON p.account_id = a.id
   WHERE a.name = $1
-), split_transaction_ids AS (
-  SELECT p.transaction_id
-  FROM postings p
-  WHERE p.transaction_id IN ( SELECT * FROM target_transaction_ids )
-  GROUP BY p.transaction_id
-  HAVING COUNT(*) > 2
 )
-SELECT t.id, t.created_at, t.narration, p.narration,
-       CASE a.name WHEN $1 THEN '-- スプリット取引 --' ELSE a.name END,
-       CASE a.name WHEN $1 THEN p.amount ELSE -p.amount END,
-       SUM(
-         CASE a.name WHEN $1 THEN p.amount ELSE -p.amount END
-       ) OVER (ORDER BY t.created_at, t.id, p.id)
+SELECT t.id, t.created_at, t.narration, p.narration, a.name, p.amount,
+       COALESCE(SUM(p.amount) FILTER ( WHERE a.name = $1 ) OVER (ORDER BY t.created_at, t.id, p.id), 0)
 FROM postings p
 INNER JOIN full_accounts a ON p.account_id = a.id
 INNER JOIN transactions t ON p.transaction_id = t.id
-WHERE (t.id IN (SELECT * FROM split_transaction_ids) AND a.name = $1)
-OR    (t.id NOT IN (SELECT * FROM split_transaction_ids) AND
-       t.id IN (SELECT * FROM target_transaction_ids) AND
-       a.name <> $1)
+WHERE t.id IN (SELECT * FROM target_transaction_ids)
 ORDER BY t.created_at, t.id, p.id
 |}
 
@@ -269,15 +256,18 @@ AND EXISTS (
       | Some (_, cur) -> (Some (tid, tx), cur :: acc)
     in
     match%lwt fold aux arg (None, []) with
-    | Error _ -> failwith "failed to decode transactions from db"
+    | Error e ->
+        failwithf "failed to decode transactions from db: %s"
+          (Caqti_error.show e)
     | Ok (None, acc) -> Lwt.return acc
     | Ok (Some (_, cur), acc) -> Lwt.return (cur :: acc)
 
   let select_transactions (module Db : Caqti_lwt.CONNECTION) =
     decode_transactions (Db.fold Q.select_transactions) ()
 
-  let select_account_transactions (module Db : Caqti_lwt.CONNECTION) account =
-    decode_transactions (Db.fold Q.select_account_transactions) account
+  let select_split_account_transactions (module Db : Caqti_lwt.CONNECTION)
+      account =
+    decode_transactions (Db.fold Q.select_split_account_transactions) account
 
   let select_accounts (module Db : Caqti_lwt.CONNECTION) =
     Db.fold Q.select_accounts List.cons () [] |> raise_if_error
@@ -360,7 +350,7 @@ let get_model_gl con =
 let get_model_accounts con =
   Store.select_accounts con
   >>= Lwt_list.map_s (fun (account, kind) ->
-          Store.select_account_transactions con account
+          Store.select_split_account_transactions con account
           >|= jingoo_model_of_transactions (Model.account_kind_of_int kind)
           >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
   >|= fun x -> Jingoo.Jg_types.Tobj x
