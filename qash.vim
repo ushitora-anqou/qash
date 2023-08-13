@@ -8,11 +8,11 @@ syntax match qashCommand "!open-account\|!import"
 syntax match qashKeyword "asset\|expense\|equity\|income\|liability"
 syntax match qashNumber "-\?\d\+"
 syntax match qashDate "\d\{4}-\d\{2}-\d\{2}"
-syntax match qashQuote "\".\+\""
 syntax match qashLineComment "//.\+"
 syntax match qashTag "#.\+"
 
 syntax region qashRangeComment start="(\*" end="\*)" contains=qashRangeComment
+syntax region qashQuote start="\"" end="\""
 
 highlight link qashCommand Keyword
 highlight link qashKeyword Type
