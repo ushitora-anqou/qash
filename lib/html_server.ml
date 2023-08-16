@@ -473,12 +473,6 @@ let generate_ok_html con =
       f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
   |> Lwt.return
 
-let generate_error_html msg =
-  let models = Jingoo.Jg_types.[ ("message", Tstr msg) ] in
-  with_file "lib/error.html.tpl" (fun f ->
-      f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
-  |> Lwt.return
-
 let generate in_filename thn err =
   try%lwt
     let m, notes = Loader.load_file in_filename in
@@ -491,9 +485,6 @@ let generate in_filename thn err =
   with e ->
     let message = match e with Failure s -> s | _ -> Printexc.to_string e in
     err message
-
-let generate_html in_filename =
-  generate in_filename generate_ok_html generate_error_html
 
 let generate_json in_filename =
   let yojson_of_jingoo_model =
@@ -548,9 +539,6 @@ let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
                  streams := ws :: !streams;
                  Lwt.async (finalize_websocket_stream ws);
                  Lwt.return_unit) );
-           ( Dream.get "/" @@ fun _ ->
-             let%lwt html = generate_html in_filename in
-             Dream.html html );
            ( Dream.get "/data.json" @@ fun _ ->
              generate_json in_filename >|= Yojson.to_string
              >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
