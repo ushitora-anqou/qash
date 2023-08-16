@@ -10,13 +10,6 @@ let () =
     group
       (info "qash" ~version:"0.1.0" ~doc:"A command-line accounting tool")
       [
-        v (info "of-gnucash-csv")
-          Term.(
-            const of_gnucash_csv
-            $ Arg.(
-                required
-                & pos 0 (some string) None
-                & info ~docv:"TRANSACTIONS-CSV-FILE" []));
         v (info "of-json")
           Term.(
             const of_json
