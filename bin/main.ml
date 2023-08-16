@@ -146,7 +146,7 @@ let generate num_entries =
 
 let () =
   Logs.set_reporter (Logs_fmt.reporter ());
-  Logs.set_level (Some Logs.Debug);
+  Logs.set_level (Some Logs.Info);
 
   let open Cmdliner in
   Cmd.(
