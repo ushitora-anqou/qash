@@ -1,6 +1,16 @@
+(* -*- tuareg -*- *)
+(* Thanks to: https://github.com/facebook/flow/blob/a3a092246084c2f9596fc2b263aef8d24eeaee92/src/hack_forked/fsnotify/dune *)
+
+let () =
+  (* https://github.com/ocaml/ocaml/blob/36c163248d77e7df0803c1e9893ad01948846081/asmcomp/x86_proc.ml#L40-L59 *)
+  let system = List.assoc "system" Jbuild_plugin.V1.ocamlc_config in
+  let fsnotify_impl = match system with
+  | "linux" -> "fsnotify_linux"
+  | _ -> "fsnotify_stub"
+  in
+  Printf.ksprintf Jbuild_plugin.V1.send {|
 (executable
  (public_name qash)
  (name main)
- (libraries qash fsnotify_linux)
- (enabled_if
-  (= %{system} linux)))
+ (libraries qash %s))
+|} fsnotify_impl

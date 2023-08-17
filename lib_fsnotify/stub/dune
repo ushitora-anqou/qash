@@ -1,0 +1,5 @@
+(library
+ (name fsnotify_stub)
+ (implements fsnotify)
+ (preprocess
+  (pps lwt_ppx ppx_deriving.make ppx_deriving.show ppx_yojson_conv)))

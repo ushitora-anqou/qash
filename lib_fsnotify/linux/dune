@@ -3,4 +3,6 @@
  (implements fsnotify)
  (preprocess
   (pps lwt_ppx ppx_deriving.make ppx_deriving.show ppx_yojson_conv))
- (libraries inotify.lwt))
+ (libraries inotify.lwt)
+ (enabled_if
+  (= %{system} linux)))
