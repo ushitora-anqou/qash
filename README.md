@@ -104,6 +104,7 @@ Qash でつけられる取引の例を（日本語で）示します。上の原
 - 例 4: 飲食店で友人の分（3,000 円）も合わせて計 6,000 円を現金で支払い、後日xxx銀行普通預金に立替分を返してもらった場合、以下 2 つの取引を記録します：
   - 取引 1: 勘定科目「現金」は `-6000`、勘定科目「食費」は `+3000`、勘定科目「立替金」は `+3000`
   - 取引 2: 勘定科目「立替金」は `-3000`、勘定科目「xxx銀行普通預金」は `+3000`
+- 例 5: xxx銀行普通預金からzzz銀行普通預金に 200,000 円振り替えた場合、勘定科目「xxx銀行普通預金」は `-200,000`、勘定科目「zzz銀行普通預金」は `+200,000`
 
 それでは実際に取引を Qash を使って書いてみます。
 Qash は上のような取引を記述するための簡単なプログラミング言語になっていて、
@@ -142,6 +143,7 @@ $ _build/default/bin/main.exe --version
 *)
 !open-account asset 現金 JPY #cash
 !open-account asset xxx銀行普通預金 JPY #cash
+!open-account asset zzz銀行普通預金 JPY #cash
 !open-account asset 立替金 JPY
 !open-account equity 開始残高 JPY
 !open-account liability yyyクレジットカード JPY
@@ -199,6 +201,13 @@ $ _build/default/bin/main.exe --version
 * 2023-01-06 "例 4: 取引 2"
   立替金                -3,000
   xxx銀行普通預金        3,000
+
+// 例 5: xxx銀行普通預金からzzz銀行普通預金に 200,000 円振り替えた場合、
+//       勘定科目「xxx銀行普通預金」は `-200,000`、
+//       勘定科目「zzz銀行普通預金」は `+200,000`
+* 2023-01-07 "例 5"
+  xxx銀行普通預金 -200,000
+  zzz銀行普通預金  200,000
 ```
 
 作ったコードを Qash に渡して、Web サーバを起動させます。
@@ -210,7 +219,8 @@ $ _build/default/bin/main.exe serve root.qash
 ```
 
 ブラウザで https://ushitora-anqou.github.io/qash-fe/#/localhost:8080 にアクセスすると
-入力したデータが表示されます。
+入力したデータが表示されます。特に「チャート」では、資産・負債・費用・収益を
+月ごとにグラフで表示します。
 
 <!-- Thanks to: https://stackoverflow.com/a/38923123 -->
 
