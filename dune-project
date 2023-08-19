@@ -30,7 +30,7 @@
   dream
   dune
   (inotify
-   (= os linux))
+   (= :os linux))
   jingoo
   logs
   lwt_ppx
