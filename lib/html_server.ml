@@ -455,25 +455,29 @@ let get_models ~year ~depth con =
   let%lwt model_asset, model_liability, model_expense, model_income =
     get_models_asset_liability_expense_income ~depth ~year con
   in
-  let%lwt model_cashflow = get_model_cashflow ~year ~depth con in
   let%lwt model_asset100, model_liability100, model_expense100, model_income100
       =
     get_models_asset_liability_expense_income ~depth:100 ~year con
   in
+  let%lwt model_cashflow = get_model_cashflow ~year ~depth con in
+  let%lwt model_cashflow100 = get_model_cashflow ~year ~depth:100 con in
 
   Lwt.return
     [
       ("gl", model_gl);
       ("account", model_accounts);
+      (**)
       ("asset", model_asset);
       ("liability", model_liability);
       ("expense", model_expense);
       ("income", model_income);
+      ("cashflow", model_cashflow);
+      (**)
       ("asset100", model_asset100);
       ("liability100", model_liability100);
       ("expense100", model_expense100);
       ("income100", model_income100);
-      ("cashflow", model_cashflow);
+      ("cashflow100", model_cashflow100);
     ]
 
 let generate_ok_html con =
