@@ -456,6 +456,11 @@ let get_models ~year ~depth con =
     get_models_asset_liability_expense_income ~depth ~year con
   in
   let%lwt model_cashflow = get_model_cashflow ~year ~depth con in
+  let%lwt model_asset100, model_liability100, model_expense100, model_income100
+      =
+    get_models_asset_liability_expense_income ~depth:100 ~year con
+  in
+
   Lwt.return
     [
       ("gl", model_gl);
@@ -464,6 +469,10 @@ let get_models ~year ~depth con =
       ("liability", model_liability);
       ("expense", model_expense);
       ("income", model_income);
+      ("asset100", model_asset100);
+      ("liability100", model_liability100);
+      ("expense100", model_expense100);
+      ("income100", model_income100);
       ("cashflow", model_cashflow);
     ]
 
