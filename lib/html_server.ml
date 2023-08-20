@@ -480,12 +480,6 @@ let get_models ~year ~depth con =
       ("cashflow100", model_cashflow100);
     ]
 
-let generate_ok_html con =
-  let%lwt models = get_models ~year:2023 ~depth:1 con in
-  with_file "lib/index.html.tpl" (fun f ->
-      f |> In_channel.input_all |> Jingoo.Jg_template.from_string ~models)
-  |> Lwt.return
-
 let generate in_filename thn err =
   try%lwt
     let m, notes = Loader.load_file in_filename in
