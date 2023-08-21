@@ -302,16 +302,6 @@ end
 
 let json_of_transactions account_kind rows : Yojson.Safe.t =
   let open Model in
-  let string_of_amount i =
-    let rec aux s =
-      if String.length s <= 3 then s
-      else
-        aux (String.sub s 0 (String.length s - 3))
-        ^ ","
-        ^ String.sub s (String.length s - 3) 3
-    in
-    aux (string_of_int i)
-  in
   rows
   |> List.map (fun tx : Yojson.Safe.t ->
          `Assoc
@@ -332,12 +322,7 @@ let json_of_transactions account_kind rows : Yojson.Safe.t =
                             ("narration", `String p.narration);
                             ("account", `String (string_of_account p.account));
                             ("amount", `Int (Option.get p.amount));
-                            ( "abs_amount_s",
-                              `String
-                                (p.amount |> Option.get |> abs
-                               |> string_of_amount) );
                             ("balance", `Int balance);
-                            ("balance_s", `String (string_of_amount balance));
                           ])) );
            ])
   |> fun x -> `List x
