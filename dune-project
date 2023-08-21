@@ -31,7 +31,6 @@
   dune
   (inotify
    (= :os linux))
-  jingoo
   logs
   lwt_ppx
   menhir

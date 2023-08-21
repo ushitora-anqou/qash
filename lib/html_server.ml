@@ -300,9 +300,7 @@ AND EXISTS (
     |> raise_if_error
 end
 
-let jingoo_model_of_transactions account_kind rows =
-  let open Jingoo in
-  let open Jg_types in
+let json_of_transactions account_kind rows : Yojson.Safe.t =
   let open Model in
   let string_of_amount i =
     let rec aux s =
@@ -315,55 +313,54 @@ let jingoo_model_of_transactions account_kind rows =
     aux (string_of_int i)
   in
   rows
-  |> List.map @@ fun tx ->
-     Tobj
-       [
-         ("date", Tstr (string_of_date tx.date));
-         ("narration", Tstr tx.narration);
-         ( "postings",
-           Tlist
-             (tx.postings
-             |> List.map (fun (p : posting) ->
-                    let balance =
-                      match account_kind with
-                      | Model.Asset | Expense -> p.balance
-                      | Liability | Equity | Income -> -p.balance
-                    in
-                    Tobj
-                      [
-                        ("narration", Tstr p.narration);
-                        ("account", Tstr (string_of_account p.account));
-                        ("amount", Tint (Option.get p.amount));
-                        ( "abs_amount_s",
-                          Tstr
-                            (p.amount |> Option.get |> abs |> string_of_amount)
-                        );
-                        ("balance", Tint balance);
-                        ("balance_s", Tstr (string_of_amount balance));
-                      ])) );
-       ]
+  |> List.map (fun tx : Yojson.Safe.t ->
+         `Assoc
+           [
+             ("date", `String (string_of_date tx.date));
+             ("narration", `String tx.narration);
+             ( "postings",
+               `List
+                 (tx.postings
+                 |> List.map (fun (p : posting) : Yojson.Safe.t ->
+                        let balance =
+                          match account_kind with
+                          | Model.Asset | Expense -> p.balance
+                          | Liability | Equity | Income -> -p.balance
+                        in
+                        `Assoc
+                          [
+                            ("narration", `String p.narration);
+                            ("account", `String (string_of_account p.account));
+                            ("amount", `Int (Option.get p.amount));
+                            ( "abs_amount_s",
+                              `String
+                                (p.amount |> Option.get |> abs
+                               |> string_of_amount) );
+                            ("balance", `Int balance);
+                            ("balance_s", `String (string_of_amount balance));
+                          ])) );
+           ])
+  |> fun x -> `List x
 
 let get_model_gl con =
-  Store.select_transactions con >|= jingoo_model_of_transactions Model.Asset
-  >|= fun x -> Jingoo.Jg_types.Tlist x
+  Store.select_transactions con >|= json_of_transactions Model.Asset
 
 let get_model_accounts con =
   Store.select_accounts con
   >>= Lwt_list.map_s (fun (account, kind) ->
           Store.select_split_account_transactions con account
-          >|= jingoo_model_of_transactions (Model.account_kind_of_int kind)
-          >|= fun model -> (account, Jingoo.Jg_types.Tlist model))
-  >|= fun x -> Jingoo.Jg_types.Tobj x
+          >|= json_of_transactions (Model.account_kind_of_int kind)
+          >|= fun model -> (account, model))
+  >|= fun x -> `Assoc x
 
 let decode_monthly_data
     (jan, feb, mar, (apr, may, jun, (jul, aug, sep, (oct, nov, dec)))) =
   [ jan; feb; mar; apr; may; jun; jul; aug; sep; oct; nov; dec ]
 
-let format_monthly_data_for_jingoo year raw_data =
-  let open Jingoo.Jg_types in
+let format_monthly_data_for_json year raw_data : Yojson.Safe.t =
   let get_monthly_labels year =
     iota 12
-    |> List.map (fun i -> Tstr (Printf.sprintf "%d-%02d-01" year (i + 1)))
+    |> List.map (fun i -> `String (Printf.sprintf "%d-%02d-01" year (i + 1)))
   in
   let labels = get_monthly_labels year in
   let data =
@@ -371,15 +368,15 @@ let format_monthly_data_for_jingoo year raw_data =
     |> List.filter_map @@ fun (account_name, stack, data) ->
        if data |> List.for_all (( = ) 0) then None
        else
-         Tobj
+         `Assoc
            [
-             ("account", Tstr account_name);
-             ("stack", Tstr stack);
-             ("data", Tlist (data |> List.map (fun x -> Tint x)));
+             ("account", `String account_name);
+             ("stack", `String stack);
+             ("data", `List (data |> List.map (fun x -> `Int x)));
            ]
          |> Option.some
   in
-  Tobj [ ("labels", Tlist labels); ("data", Tlist data) ]
+  `Assoc [ ("labels", `List labels); ("data", `List data) ]
 
 let get_models_asset_liability_expense_income ~depth ~year con =
   let get_raw_data ~account ~depth ~year kind column =
@@ -401,19 +398,19 @@ let get_models_asset_liability_expense_income ~depth ~year con =
   in
   let%lwt asset =
     get_raw_data ~account:Asset ~depth ~year `Stock `Debt
-    >|= format_monthly_data_for_jingoo year
+    >|= format_monthly_data_for_json year
   in
   let%lwt liability =
     get_raw_data ~account:Liability ~depth ~year `Stock `Credit
-    >|= format_monthly_data_for_jingoo year
+    >|= format_monthly_data_for_json year
   in
   let%lwt expense =
     get_raw_data ~account:Expense ~depth ~year `Flow `Debt
-    >|= format_monthly_data_for_jingoo year
+    >|= format_monthly_data_for_json year
   in
   let%lwt income =
     get_raw_data ~account:Income ~depth ~year `Flow `Credit
-    >|= format_monthly_data_for_jingoo year
+    >|= format_monthly_data_for_json year
   in
   Lwt.return (asset, liability, expense, income)
 
@@ -445,7 +442,7 @@ let get_model_cashflow ~year ~depth con =
     in
     List.combine sum_in sum_out |> List.map (fun (x, y) -> x - y)
   in
-  format_monthly_data_for_jingoo year
+  format_monthly_data_for_json year
     (cashflow_in @ cashflow_out @ [ ("net", "net", cashflow) ])
   |> Lwt.return
 
@@ -466,13 +463,11 @@ let get_models ~year ~depth con =
     [
       ("gl", model_gl);
       ("account", model_accounts);
-      (**)
       ("asset", model_asset);
       ("liability", model_liability);
       ("expense", model_expense);
       ("income", model_income);
       ("cashflow", model_cashflow);
-      (**)
       ("asset100", model_asset100);
       ("liability100", model_liability100);
       ("expense100", model_expense100);
@@ -494,25 +489,7 @@ let generate in_filename thn err =
     err message
 
 let generate_json in_filename =
-  let yojson_of_jingoo_model =
-    let open Jingoo.Jg_types in
-    let rec aux = function
-      | Tint i -> `Int i
-      | Tfloat f -> `Float f
-      | Tbool b -> `Bool b
-      | Tstr s -> `String s
-      | Tnull -> `Null
-      | Tlist xs -> `List (List.map aux xs)
-      | Tobj xs -> `Assoc (List.map (fun (k, v) -> (k, aux v)) xs)
-      | _ -> failwith "yojson_of_jingoo_model: unsupported type"
-    in
-    aux
-  in
-  let aux_ok con =
-    get_models ~year:2023 ~depth:1 con
-    >|= List.map (fun (k, v) -> (k, yojson_of_jingoo_model v))
-    >|= fun xs -> `Assoc xs
-  in
+  let aux_ok con = get_models ~year:2023 ~depth:1 con >|= fun xs -> `Assoc xs in
   let aux_err msg = `Assoc [ ("error", `String msg) ] |> Lwt.return in
   generate in_filename aux_ok aux_err
 
@@ -547,7 +524,7 @@ let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
                  Lwt.async (finalize_websocket_stream ws);
                  Lwt.return_unit) );
            ( Dream.get "/data.json" @@ fun _ ->
-             generate_json in_filename >|= Yojson.to_string
+             generate_json in_filename >|= Yojson.Safe.to_string
              >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
          ]
   in

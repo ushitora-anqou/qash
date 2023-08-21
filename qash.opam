@@ -18,7 +18,6 @@ depends: [
   "dream"
   "dune" {>= "3.8"}
   "inotify" {os = "linux"}
-  "jingoo"
   "logs"
   "lwt_ppx"
   "menhir"

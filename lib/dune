@@ -16,6 +16,5 @@
   csv
   dream
   fsnotify
-  jingoo
   logs.fmt
   pcre))
