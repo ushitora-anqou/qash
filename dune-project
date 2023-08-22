@@ -5,24 +5,26 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github ushitora-anqou/qash))
 
-(authors "Author Name")
+(authors "Ushitora Anqou")
 
-(maintainers "Maintainer Name")
+(maintainers "Ushitora Anqou")
 
 (license LICENSE)
 
-(documentation https://url/to/documentation)
+(documentation https://github.com/ushitora-anqou/qash)
 
 (package
  (name qash)
- (synopsis "A short synopsis")
- (description "A longer description")
- (tags
-  (topics "to describe" your project))
+ (synopsis "A programming language for double-entry accounting")
+ (description
+  "A programming language for double-entry accounting, inspired by Beancount")
+ (tags (accounting))
  (depends
-  alcotest
+  (alcotest :with-test)
+  (ocamlformat
+   (= 0.26.0))
   caqti
   caqti-driver-sqlite3
   caqti-lwt
@@ -36,6 +38,7 @@
   menhir
   ocaml
   pcre
+  ppx_deriving
   (ppx_yojson_conv
    (<= v0.15.1))
   yojson))

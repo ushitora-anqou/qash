@@ -123,7 +123,7 @@ $ eval $(opam env --switch=default)
 $ git clone https://github.com/ushitora-anqou/qash.git
 $ cd qash
 $ opam install . --deps-only
-$ dune build
+$ dune build bin/main.exe
 $ _build/default/bin/main.exe --version
 0.1.0
 ```
