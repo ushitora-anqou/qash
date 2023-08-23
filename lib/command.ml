@@ -51,7 +51,7 @@ let serve =
     | [ interface; port ] -> (interface, int_of_string port)
     | _ -> failwithf "Invalid BIND: %s" (Sys.getenv "BIND")
   in
-  Html_server.serve ~interface ~port
+  Web_server.serve ~interface ~port
 
 let generate num_entries =
   Generator.generate_sample num_entries |> print_endline
