@@ -25,9 +25,6 @@
   (alcotest :with-test)
   (ocamlformat
    (= 0.26.0))
-  caqti
-  caqti-driver-sqlite3
-  caqti-lwt
   csv
   dream
   dune
@@ -41,6 +38,7 @@
   ppx_deriving
   (ppx_yojson_conv
    (<= v0.15.1))
+  sqlite3
   yojson))
 
 (using menhir 2.1)

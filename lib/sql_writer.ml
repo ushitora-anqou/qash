@@ -1,6 +1,3 @@
-open Lwt.Infix
-open Util
-
 let escape_single_quote s =
   let buf = Buffer.create (String.length s) in
   String.iter
@@ -15,12 +12,8 @@ module Store = struct
   let string_of_account account = String.concat ":" account
 
   module Q = struct
-    open Caqti_request.Infix
-    open Caqti_type.Std
-
     let create_accounts =
-      (unit ->. unit)
-        {|
+      {|
 CREATE TABLE accounts (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -32,8 +25,7 @@ CREATE TABLE accounts (
 )|}
 
     let create_transactions =
-      (unit ->. unit)
-        {|
+      {|
 CREATE TABLE transactions (
   id INTEGER PRIMARY KEY,
   created_at TEXT NOT NULL,
@@ -41,8 +33,7 @@ CREATE TABLE transactions (
 )|}
 
     let create_postings =
-      (unit ->. unit)
-        {|
+      {|
 CREATE TABLE postings (
   id INTEGER PRIMARY KEY,
   account_id INTEGER NOT NULL,
@@ -56,8 +47,7 @@ CREATE TABLE postings (
 )|}
 
     let create_full_accounts_view =
-      (unit ->. unit)
-        {|
+      {|
 CREATE VIEW full_accounts AS
 WITH RECURSIVE tree(id, name, currency, parent_id, kind, depth) AS (
   SELECT id, name, currency, parent_id, kind, 0 FROM accounts WHERE parent_id IS NULL
@@ -68,16 +58,14 @@ SELECT id, name, currency, kind, depth FROM tree
 |}
 
     let create_tags =
-      (unit ->. unit)
-        {|
+      {|
 CREATE TABLE tags (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE
 )|}
 
     let create_transaction_tag =
-      (unit ->. unit)
-        {|
+      {|
 CREATE TABLE transaction_tags (
   transaction_id INTEGER NOT NULL,
   tag_id INTEGER NOT NULL,
@@ -86,8 +74,7 @@ CREATE TABLE transaction_tags (
 )|}
 
     let create_account_tag =
-      (unit ->. unit)
-        {|
+      {|
 CREATE TABLE account_tags (
   account_id INTEGER NOT NULL,
   tag_id INTEGER NOT NULL,
@@ -97,9 +84,8 @@ CREATE TABLE account_tags (
 
     let create_account_transactions_view account =
       (* FIXME: This query is insecure against SQL injection. *)
-      (unit ->. unit)
-      @@ Printf.sprintf
-           {|
+      Printf.sprintf
+        {|
 CREATE VIEW '%s' AS
 WITH target_transaction_ids AS (
   SELECT p.transaction_id
@@ -131,137 +117,108 @@ OR    (t.id NOT IN (SELECT * FROM split_transaction_ids) AND
        a.name <> '%s')
 ORDER BY t.created_at DESC, t.id DESC, p.id DESC
 |}
-           account account account account account account account
+        account account account account account account account
 
     let insert_account =
-      (tup4 string string (option int) int ->! int)
-        {|INSERT INTO accounts (name, currency, parent_id, kind) VALUES (?, ?, ?, ?) RETURNING id|}
+      {|INSERT INTO accounts (id, name, currency, parent_id, kind) VALUES (?, ?, ?, ?, ?) RETURNING id|}
 
     let insert_transaction =
-      (tup2 string string ->! int)
-        {|INSERT INTO transactions (created_at, narration) VALUES (?, ?) RETURNING id|}
+      {|INSERT INTO transactions (id, created_at, narration) VALUES (?, ?, ?) RETURNING id|}
 
     let insert_posting =
-      (tup4 int int int string ->. unit)
-        {|INSERT INTO postings (account_id, transaction_id, amount, narration) VALUES (?, ?, ?, ?)|}
+      {|INSERT INTO postings (id, account_id, transaction_id, amount, narration) VALUES (?, ?, ?, ?, ?)|}
 
-    let insert_tag =
-      (string ->! int) {|INSERT INTO tags (name) VALUES (?) RETURNING id|}
+    let insert_tag = {|INSERT INTO tags (id, name) VALUES (?, ?) RETURNING id|}
 
     let insert_transaction_tag =
-      (tup2 int int ->. unit)
-        {|INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)|}
+      {|INSERT INTO transaction_tags (transaction_id, tag_id) VALUES (?, ?)|}
 
     let insert_account_tag =
-      (tup2 int int ->. unit)
-        {|INSERT INTO account_tags (account_id, tag_id) VALUES (?, ?)|}
+      {|INSERT INTO account_tags (account_id, tag_id) VALUES (?, ?)|}
 
     let select_account =
-      (tup3 string string (option int) ->? int)
-        {|SELECT id FROM accounts WHERE name = ? AND currency = ? AND parent_id IS ?|}
-
-    let select_account_by_fullname =
-      (string ->! int) {|SELECT id FROM full_accounts WHERE name = ?|}
-
-    let select_tag = (string ->! int) {|SELECT id FROM tags WHERE name = ?|}
+      {|SELECT id FROM accounts WHERE name = ? AND currency = ? AND parent_id IS ?|}
   end
 
-  let raise_if_error f =
-    match%lwt f with
-    | Ok x -> Lwt.return x
-    | Error e -> failwith (Caqti_error.show e)
+  open Datastore
 
-  let create_accounts (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_accounts () |> raise_if_error
+  let create_accounts (con : connection) =
+    execute (prepare con Q.create_accounts) [] |> Result.get_ok
 
-  let create_transactions (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_transactions () |> raise_if_error
+  let create_transactions (con : connection) =
+    execute (prepare con Q.create_transactions) [] |> Result.get_ok
 
-  let create_postings (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_postings () |> raise_if_error
+  let create_postings (con : connection) =
+    execute (prepare con Q.create_postings) [] |> Result.get_ok
 
-  let create_full_accounts_view (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_full_accounts_view () |> raise_if_error
+  let create_full_accounts_view (con : connection) =
+    execute (prepare con Q.create_full_accounts_view) [] |> Result.get_ok
 
-  let create_tags (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_tags () |> raise_if_error
+  let create_tags (con : connection) =
+    execute (prepare con Q.create_tags) [] |> Result.get_ok
 
-  let create_transaction_tags (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_transaction_tag () |> raise_if_error
+  let create_transaction_tags (con : connection) =
+    execute (prepare con Q.create_transaction_tag) [] |> Result.get_ok
 
-  let create_account_tags (module Db : Caqti_lwt.CONNECTION) =
-    Db.exec Q.create_account_tag () |> raise_if_error
+  let create_account_tags (con : connection) =
+    execute (prepare con Q.create_account_tag) [] |> Result.get_ok
 
-  let create_account_transactions_view (module Db : Caqti_lwt.CONNECTION)
-      ~account =
-    Db.exec (Q.create_account_transactions_view account) () |> raise_if_error
+  let create_account_transactions_view (con : connection) ~account =
+    execute (prepare con (Q.create_account_transactions_view account)) []
+    |> Result.get_ok
 
-  let insert_account (module Db : Caqti_lwt.CONNECTION) ~account ~currency ~kind
-      =
-    let parent_id = ref None in
-    account
-    |> Lwt_list.iter_s (fun name ->
-           let%lwt id =
-             match%lwt
-               Db.find_opt Q.select_account (name, currency, !parent_id)
-               |> raise_if_error
-             with
-             | Some id -> Lwt.return id
-             | None ->
-                 Db.find Q.insert_account (name, currency, !parent_id, kind)
-                 |> raise_if_error
-           in
-           Lwt.return (parent_id := Some id));%lwt
-    !parent_id |> Option.get |> Lwt.return
+  let insert_accounts (con : connection) recs =
+    let stmt = prepare con Q.insert_account in
+    recs
+    |> List.iter (fun (id, name, currency, parent_id, kind) ->
+           execute stmt
+             [
+               Int id;
+               Text name;
+               Text currency;
+               parent_id |> Option.fold ~none:Null ~some:(fun x -> Int x);
+               Int kind;
+             ]
+           |> Result.get_ok)
 
-  let insert_transaction (module Db : Caqti_lwt.CONNECTION) ~date ~narration =
-    Db.find Q.insert_transaction (string_of_date date, narration)
-    |> raise_if_error
+  let insert_transactions (con : connection) recs =
+    let stmt = prepare con Q.insert_transaction in
+    recs
+    |> List.iter (fun (id, created_at, narration) ->
+           execute stmt [ Int id; Text created_at; Text narration ]
+           |> Result.get_ok)
 
-  let insert_transactions (module Db : Caqti_lwt.CONNECTION)
-      (txs : Model.transaction list) =
-    (* FIXME: SQL injection *)
-    let query =
-      txs
-      |> List.map (fun (tx : Model.transaction) ->
-             Printf.sprintf "('%s', '%s')" (string_of_date tx.date) tx.narration)
-      |> String.concat " "
-      |> Printf.sprintf
-           {|INSERT INTO transactions (created_at, narration) VALUES %s RETURNING id|}
-    in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    Db.fold_s ((unit ->* int) query) (fun x xs -> Lwt.return_ok (x :: xs)) () []
-    |> raise_if_error
+  let insert_postings (con : connection) recs =
+    let stmt = prepare con Q.insert_posting in
+    recs
+    |> List.iter (fun (id, account_id, transaction_id, amount, narration) ->
+           execute stmt
+             [
+               Int id;
+               Int account_id;
+               Int transaction_id;
+               Int amount;
+               Text narration;
+             ]
+           |> Result.get_ok)
 
-  let insert_posting (module Db : Caqti_lwt.CONNECTION) ~account_id
-      ~transaction_id ~amount ~narration =
-    Db.exec Q.insert_posting (account_id, transaction_id, amount, narration)
-    |> raise_if_error
+  let insert_tags (con : connection) recs =
+    let stmt = prepare con Q.insert_tag in
+    recs
+    |> List.iter (fun (id, name) ->
+           execute stmt [ Int id; Text name ] |> Result.get_ok)
 
-  let insert_tag (module Db : Caqti_lwt.CONNECTION) ~name =
-    Db.find Q.insert_tag name |> raise_if_error
+  let insert_transaction_tags (con : connection) recs =
+    let stmt = prepare con Q.insert_transaction_tag in
+    recs
+    |> List.iter (fun (transaction_id, tag_id) ->
+           execute stmt [ Int transaction_id; Int tag_id ] |> Result.get_ok)
 
-  let insert_transaction_tag (module Db : Caqti_lwt.CONNECTION) ~transaction_id
-      ~tag_id =
-    Db.exec Q.insert_transaction_tag (transaction_id, tag_id) |> raise_if_error
-
-  let insert_account_tag (module Db : Caqti_lwt.CONNECTION) ~account_id ~tag_id
-      =
-    Db.exec Q.insert_account_tag (account_id, tag_id) |> raise_if_error
-
-  let select_tag (module Db : Caqti_lwt.CONNECTION) ~name =
-    Db.find Q.select_tag name |> raise_if_error
-
-  let select_account_by_fullname (module Db : Caqti_lwt.CONNECTION) account =
-    match%lwt
-      Db.find Q.select_account_by_fullname (string_of_account account)
-    with
-    | Ok x -> Lwt.return x
-    | Error e ->
-        failwithf "Couldn't select account by fullname: %s: %s"
-          (string_of_account account)
-          (Caqti_error.show e)
+  let insert_account_tags (con : connection) recs =
+    let stmt = prepare con Q.insert_account_tag in
+    recs
+    |> List.iter (fun (account_id, tag_id) ->
+           execute stmt [ Int account_id; Int tag_id ] |> Result.get_ok)
 end
 
 module StringMap = Map.Make (String)
@@ -294,7 +251,13 @@ let dump_account_records (model : Model.t) account_id_map =
          |> List.fold_left
               (fun (parent_id, recs) name ->
                 let id = account_id_map |> StringMap.find name in
-                (Some id, (id, name, a.currency, parent_id, a.kind) :: recs))
+                ( Some id,
+                  ( id,
+                    name,
+                    a.currency,
+                    parent_id,
+                    Model.int_of_account_kind a.kind )
+                  :: recs ))
               (None, [])
          |> snd)
   |> List.flatten |> List.sort_uniq compare
@@ -348,14 +311,15 @@ let dump_transaction_tag_records (model : Model.t) tag_id_map =
          t.tags |> List.map (fun tag -> (i, tag_id_map |> StringMap.find tag)))
   |> List.flatten |> List.sort_uniq compare
 
-let dump uri (model : Model.t) =
-  let%lwt con = Caqti_lwt.connect (Uri.of_string uri) >>= Caqti_lwt.or_fail in
-  Store.create_accounts con;%lwt
-  Store.create_transactions con;%lwt
-  Store.create_postings con;%lwt
-  Store.create_tags con;%lwt
-  Store.create_transaction_tags con;%lwt
-  Store.create_account_tags con;%lwt
+let dump path (model : Model.t) =
+  let con = Datastore.(connect path) in
+
+  Store.create_accounts con;
+  Store.create_transactions con;
+  Store.create_postings con;
+  Store.create_tags con;
+  Store.create_transaction_tags con;
+  Store.create_account_tags con;
 
   let account_id_map = dump_account_id_map model in
   let tag_id_map = dump_tag_id_map model in
@@ -369,122 +333,20 @@ let dump uri (model : Model.t) =
   in
   let transaction_tag_records = dump_transaction_tag_records model tag_id_map in
 
-  (* Insert accounts *)
-  let%lwt _ =
-    let module C = (val con : Caqti_lwt.CONNECTION) in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    C.exec
-      ((unit ->. unit)
-      @@ Printf.sprintf
-           {|INSERT INTO accounts (id, name, currency, parent_id, kind) VALUES %s|}
-           (account_records
-           |> List.map (fun (id, name, currency, parent_id, kind) ->
-                  Printf.sprintf "(%d, '%s', '%s', %s, %d)" id
-                    (escape_single_quote name)
-                    (escape_single_quote currency)
-                    (parent_id
-                    |> Option.fold ~none:"NULL" ~some:(fun i -> string_of_int i)
-                    )
-                    (Model.int_of_account_kind kind))
-           |> String.concat ", "))
-      ()
-    |> Store.raise_if_error
-  in
+  Store.insert_accounts con account_records;
+  Store.insert_tags con tag_records;
+  Store.insert_account_tags con account_tag_records;
+  Store.insert_transactions con transaction_records;
+  Store.insert_postings con posting_records;
+  Store.insert_transaction_tags con transaction_tag_records;
 
-  (* Insert tags *)
-  let%lwt _ =
-    let module C = (val con : Caqti_lwt.CONNECTION) in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    C.exec
-      ((unit ->. unit)
-      @@ Printf.sprintf {|INSERT INTO tags (id, name) VALUES %s|}
-           (tag_records
-           |> List.map (fun (id, name) -> Printf.sprintf "(%d, '%s')" id name)
-           |> String.concat ", "))
-      ()
-    |> Store.raise_if_error
-  in
-
-  (* Insert account_tags *)
-  let%lwt _ =
-    let module C = (val con : Caqti_lwt.CONNECTION) in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    C.exec
-      ((unit ->. unit)
-      @@ Printf.sprintf
-           {|INSERT INTO account_tags (account_id, tag_id) VALUES %s|}
-           (account_tag_records
-           |> List.map (fun (account_id, tag_id) ->
-                  Printf.sprintf "(%d, %d)" account_id tag_id)
-           |> String.concat ", "))
-      ()
-    |> Store.raise_if_error
-  in
-
-  (* Insert transactions *)
-  let%lwt _ =
-    let module C = (val con : Caqti_lwt.CONNECTION) in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    C.exec
-      ((unit ->. unit)
-      @@ Printf.sprintf
-           {|INSERT INTO transactions (id, created_at, narration) VALUES %s|}
-           (transaction_records
-           |> List.map (fun (id, date, narration) ->
-                  Printf.sprintf "(%d, '%s', '%s')" id date
-                    (escape_single_quote narration))
-           |> String.concat ", "))
-      ()
-    |> Store.raise_if_error
-  in
-
-  (* Insert postings *)
-  let%lwt _ =
-    let module C = (val con : Caqti_lwt.CONNECTION) in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    C.exec
-      ((unit ->. unit)
-      @@ Printf.sprintf
-           {|INSERT INTO postings (id, account_id, transaction_id, amount, narration) VALUES %s|}
-           (posting_records
-           |> List.map
-                (fun (id, account_id, transaction_id, amount, narration) ->
-                  Printf.sprintf "(%d, %d, %d, %d, '%s')" id account_id
-                    transaction_id amount narration)
-           |> String.concat ", "))
-      ()
-    |> Store.raise_if_error
-  in
-
-  (* Insert transaction_tags *)
-  let%lwt _ =
-    let module C = (val con : Caqti_lwt.CONNECTION) in
-    let open Caqti_request.Infix in
-    let open Caqti_type.Std in
-    C.exec
-      ((unit ->. unit)
-      @@ Printf.sprintf
-           {|INSERT INTO transaction_tags (transaction_id, tag_id) VALUES %s|}
-           (transaction_tag_records
-           |> List.map (fun (transaction_id, tag_id) ->
-                  Printf.sprintf "(%d, %d)" transaction_id tag_id)
-           |> String.concat ", "))
-      ()
-    |> Store.raise_if_error
-  in
-
-  Store.create_full_accounts_view con;%lwt
+  Store.create_full_accounts_view con;
 
   (model.accounts
-  |> Lwt_list.iter_s @@ fun (acc : Model.open_account) ->
+  |> List.iter @@ fun (acc : Model.open_account) ->
      Store.create_account_transactions_view con
-       ~account:(String.concat ":" acc.account));%lwt
+       ~account:(String.concat ":" acc.account));
 
-  Lwt.return con
+  con
 
-let dump_on_memory = dump "sqlite3::memory:"
+let dump_on_memory = dump Datastore.in_memory_database

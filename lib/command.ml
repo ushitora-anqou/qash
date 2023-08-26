@@ -1,5 +1,4 @@
 open Util
-open Lwt.Infix
 
 let to_json filename =
   match Parser.parse_file filename with
@@ -21,8 +20,7 @@ let check filename =
   try
     let m, notes = Loader.load_file filename in
     match
-      Lwt_main.run
-        (Sql_writer.dump_on_memory m >>= fun con -> Verifier.verify con notes)
+      Sql_writer.dump_on_memory m |> fun con -> Verifier.verify con notes
     with
     | Ok () ->
         Printf.printf "%d accounts\n%d transactions\n" (List.length m.accounts)
@@ -32,14 +30,8 @@ let check filename =
 
 let dump in_filename out_filename =
   let m, _ = Loader.load_file in_filename in
-  Lwt_main.run
-  @@
-  let%lwt _ =
-    Sql_writer.dump
-      ("sqlite3://" ^ Filename.concat (Sys.getcwd ()) out_filename)
-      m
-  in
-  Lwt.return_unit
+  let filepath = Filename.concat (Sys.getcwd ()) out_filename in
+  Sql_writer.dump filepath m |> ignore
 
 let serve =
   let interface, port =

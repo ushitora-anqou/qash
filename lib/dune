@@ -9,12 +9,4 @@
  (name qash)
  (preprocess
   (pps lwt_ppx ppx_deriving.make ppx_deriving.show ppx_yojson_conv))
- (libraries
-  caqti-driver-sqlite3
-  caqti-lwt
-  cmdliner
-  csv
-  dream
-  fsnotify
-  logs.fmt
-  pcre))
+ (libraries cmdliner csv dream fsnotify logs.fmt pcre sqlite3))
