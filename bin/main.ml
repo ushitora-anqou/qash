@@ -34,6 +34,11 @@ let () =
                 required & pos 0 (some string) None & info ~docv:"IN-FILE" [])
             $ Arg.(
                 required & pos 1 (some string) None & info ~docv:"OUT-FILE" []));
+        v (info "dump-csv")
+          Term.(
+            const dump_csv
+            $ Arg.(
+                required & pos 0 (some string) None & info ~docv:"IN-FILE" []));
         v (info "generate")
           Term.(
             const generate
