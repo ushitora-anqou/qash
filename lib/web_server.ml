@@ -30,7 +30,8 @@ INNER JOIN transactions t ON p.transaction_id = t.id
 ORDER BY t.created_at, t.id, p.id
 |}
 
-    let select_accounts = {|SELECT name, kind FROM full_accounts ORDER BY name|}
+    let select_accounts =
+      {|SELECT name, kind FROM full_accounts ORDER BY name DESC|}
 
     let select_cumulative_sum_amount_by_depth_account_year =
       {|
