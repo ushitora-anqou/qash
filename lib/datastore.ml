@@ -1,5 +1,5 @@
 type connection = Sqlite3.db
-type prepared_stmt = Sqlite3.stmt
+type prepared_stmt = { sql : string; stmt : Sqlite3.stmt }
 type value = Int of int | Text of string | Null
 
 let value_of_sqlite3_data = function
@@ -16,7 +16,7 @@ let sqlite3_data_of_value = function
 let in_memory_database = ":memory:"
 let connect path = Sqlite3.db_open path
 let disconnect con = Sqlite3.db_close con |> ignore
-let prepare conn sql = Sqlite3.prepare conn sql
+let prepare conn sql = { sql; stmt = Sqlite3.prepare conn sql }
 
 exception Sqlite_error of string
 
@@ -25,13 +25,23 @@ let raise_if_not_success rc =
   else raise (Sqlite_error (Sqlite3.Rc.to_string rc))
 
 let query stmt values =
+  let timeit f =
+    let start_time = Unix.gettimeofday () in
+    let result = f () in
+    let end_time = Unix.gettimeofday () in
+    Dream.debug (fun m -> m "QUERY: %f %s" (end_time -. start_time) stmt.sql);
+    result
+  in
+
+  timeit @@ fun () ->
   try
-    Sqlite3.reset stmt |> raise_if_not_success;
+    Sqlite3.reset stmt.stmt |> raise_if_not_success;
     values
     |> List.map sqlite3_data_of_value
-    |> Sqlite3.bind_values stmt |> raise_if_not_success;
+    |> Sqlite3.bind_values stmt.stmt
+    |> raise_if_not_success;
     let result, rows =
-      Sqlite3.fold stmt ~init:[] ~f:(fun acc row ->
+      Sqlite3.fold stmt.stmt ~init:[] ~f:(fun acc row ->
           (Array.to_list row |> List.map value_of_sqlite3_data) :: acc)
     in
     raise_if_not_success result;
