@@ -41,11 +41,6 @@ let dump in_filename out_filename =
   in
   Lwt.return_unit
 
-let dump_csv in_filename =
-  let m, _ = Loader.load_file in_filename in
-  Sql_writer.dump_csv m;
-  ()
-
 let serve =
   let interface, port =
     match

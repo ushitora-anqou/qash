@@ -348,60 +348,6 @@ let dump_transaction_tag_records (model : Model.t) tag_id_map =
          t.tags |> List.map (fun tag -> (i, tag_id_map |> StringMap.find tag)))
   |> List.flatten |> List.sort_uniq compare
 
-let dump_csv (model : Model.t) =
-  let account_id_map = dump_account_id_map model in
-  let tag_id_map = dump_tag_id_map model in
-  let account_records = dump_account_records model account_id_map in
-  let tag_records = dump_tag_records model tag_id_map in
-  let account_tag_records =
-    dump_account_tag_records model account_id_map tag_id_map
-  in
-  let transaction_records, posting_records =
-    dump_transaction_records_and_posting_records model account_id_map
-  in
-  let transaction_tag_records = dump_transaction_tag_records model tag_id_map in
-
-  let oc = open_out "accounts.csv" in
-  account_records
-  |> List.iter (fun (id, name, currency, parent_id, kind) ->
-         Printf.fprintf oc "%d,%s,%s,%s,%d\n" id name currency
-           (parent_id
-           |> Option.fold ~none:"NULL" ~some:(fun id -> string_of_int id))
-           (Model.int_of_account_kind kind));
-  close_out oc;
-
-  let oc = open_out "tags.csv" in
-  tag_records
-  |> List.iter (fun (id, name) -> Printf.fprintf oc "%d,%s\n" id name);
-  close_out oc;
-
-  let oc = open_out "account_tags.csv" in
-  account_tag_records
-  |> List.iter (fun (account_id, tag_id) ->
-         Printf.fprintf oc "%d,%d\n" account_id tag_id);
-  close_out oc;
-
-  let oc = open_out "transactions.csv" in
-  transaction_records
-  |> List.iter (fun (id, date, narration) ->
-         Printf.fprintf oc "%d,%s,%s\n" id date narration);
-  close_out oc;
-
-  let oc = open_out "postings.csv" in
-  posting_records
-  |> List.iter (fun (id, account_id, transaction_id, amount, narration) ->
-         Printf.fprintf oc "%d,%d,%d,%d,%s\n" id account_id transaction_id
-           amount narration);
-  close_out oc;
-
-  let oc = open_out "transaction_tags.csv" in
-  transaction_tag_records
-  |> List.iter (fun (transaction_id, tag_id) ->
-         Printf.fprintf oc "%d,%d\n" transaction_id tag_id);
-  close_out oc;
-
-  ()
-
 let dump uri (model : Model.t) =
   let%lwt con = Caqti_lwt.connect (Uri.of_string uri) >>= Caqti_lwt.or_fail in
   Store.create_accounts con;%lwt
