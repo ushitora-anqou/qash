@@ -14,7 +14,22 @@ let sqlite3_data_of_value = function
   | Null -> Sqlite3.Data.NULL
 
 let in_memory_database = ":memory:"
-let connect path = Sqlite3.db_open path
+
+let execute_no_prepare con sql =
+  let rc = Sqlite3.exec con sql in
+  if Sqlite3.Rc.is_success rc then Ok () else Error (Sqlite3.Rc.to_string rc)
+
+let connect path =
+  let con = Sqlite3.db_open path in
+
+  (* Thanks to: https://phiresky.github.io/blog/2020/sqlite-performance-tuning/ *)
+  execute_no_prepare con "pragma journal_mode = WAL" |> Result.get_ok;
+  execute_no_prepare con "pragma synchronous = normal" |> Result.get_ok;
+  execute_no_prepare con "pragma temp_store = memory" |> Result.get_ok;
+  execute_no_prepare con "pragma mmap_size = 30000000000" |> Result.get_ok;
+
+  con
+
 let disconnect con = Sqlite3.db_close con |> ignore
 let prepare conn sql = { sql; stmt = Sqlite3.prepare conn sql }
 
