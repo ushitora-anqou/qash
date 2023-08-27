@@ -1,7 +1,7 @@
 open Qash
 
 let test_overwrite () =
-  let t = Loader.load_file "../../../test/src/01.qash" in
+  let t = Lwt_main.run @@ Loader.load_file "../../../test/src/01.qash" in
   let Model.{ accounts; transactions; _ }, _ = t in
   assert (
     accounts

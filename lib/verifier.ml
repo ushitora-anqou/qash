@@ -24,7 +24,8 @@ HAVING sum(p.amount) <> 0
          | _ -> assert false)
 end
 
-let verify_balanced_transactions con =
+let verify_balanced_transactions pool =
+  Datastore.use pool @@ fun con ->
   let unbalanced = Store.select_unbalance_transactions con in
   if unbalanced <> [] then
     Error
@@ -35,7 +36,8 @@ let verify_balanced_transactions con =
       |> Printf.sprintf "Unbalanced transactions:\n%s")
   else Ok ()
 
-let verify_notes (con : Datastore.connection) notes =
+let verify_notes pool notes =
+  Datastore.use pool @@ fun con ->
   try
     notes
     |> List.iter (fun note ->
@@ -54,8 +56,8 @@ let verify_notes (con : Datastore.connection) notes =
     Ok ()
   with Failure s -> Error s
 
-let verify con notes =
-  let ( let* ) = Result.bind in
-  let* () = verify_balanced_transactions con in
-  let* () = verify_notes con notes in
-  Ok ()
+let verify pool notes =
+  let ( let* ) = Lwt_result.bind in
+  let* () = verify_balanced_transactions pool in
+  let* () = verify_notes pool notes in
+  Lwt.return_ok ()

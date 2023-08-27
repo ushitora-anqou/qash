@@ -1,3 +1,5 @@
+open Lwt.Infix
+
 let escape_single_quote s =
   let buf = Buffer.create (String.length s) in
   String.iter
@@ -313,9 +315,8 @@ let dump_transaction_tag_records (model : Model.t) tag_id_map =
          t.tags |> List.map (fun tag -> (i, tag_id_map |> StringMap.find tag)))
   |> List.flatten |> List.sort_uniq compare
 
-let dump path (model : Model.t) =
-  let con = Datastore.(connect path) in
-
+let dump' model pool =
+  Datastore.use pool @@ fun con ->
   Store.create_accounts con;
   Store.create_transactions con;
   Store.create_postings con;
@@ -344,11 +345,15 @@ let dump path (model : Model.t) =
 
   Store.create_full_accounts_view con;
 
-  (model.accounts
+  model.accounts
   |> List.iter @@ fun (acc : Model.open_account) ->
      Store.create_account_transactions_view con
-       ~account:(String.concat ":" acc.account));
+       ~account:(String.concat ":" acc.account)
 
-  con
+let dump path (model : Model.t) =
+  let pool = Datastore.open_db path in
+  dump' model pool >|= fun () -> pool
 
-let dump_on_memory = dump Datastore.in_memory_database
+let with_dump_file (m : Model.t) f =
+  Lwt_io.with_temp_dir ~prefix:"qash-" @@ fun tempdir ->
+  dump (Filename.concat tempdir "db") m >>= f

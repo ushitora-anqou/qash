@@ -1,3 +1,5 @@
 (tests
  (names test_parser test_model test_loader test_datastore)
+ (preprocess
+  (pps lwt_ppx))
  (libraries qash alcotest fsnotify_stub))

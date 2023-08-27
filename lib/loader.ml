@@ -2,7 +2,8 @@ open Util
 
 type note = Assert of string | Show of string
 
-let load_file filename =
+let load_file' mtx filename =
+  Lwt_mutex.with_lock mtx @@ fun () ->
   let overwrite_transactions (base : Model.transactions)
       (overlay : Model.transactions) =
     overlay
@@ -87,4 +88,8 @@ let load_file filename =
              ({ accounts = []; transactions = [] }, [])
   in
   let model, notes = aux filename in
-  (model, List.rev notes)
+  Lwt.return (model, List.rev notes)
+
+let load_file =
+  let mtx = Lwt_mutex.create () in
+  load_file' mtx

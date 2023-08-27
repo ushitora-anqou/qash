@@ -1,7 +1,19 @@
 open Qash.Datastore
 
+let with_temp_file f =
+  let filepath = Filename.temp_file "qash" "test" in
+  Fun.protect ~finally:(fun () -> Sys.remove filepath) (fun () -> f filepath)
+
+let iota n = List.init n Fun.id
+
+let setup_db (f : connection_pool -> unit Lwt.t) =
+  with_temp_file @@ fun db_path ->
+  let pool = open_db db_path in
+  Lwt_main.run (Lwt.finalize (fun () -> f pool) (fun () -> close_db pool))
+
 let test_query_case1 () =
-  let con = connect in_memory_database in
+  setup_db @@ fun pool ->
+  use pool @@ fun con ->
   let stmt = prepare con "SELECT 1" in
   let res = query stmt [] in
   match res with
@@ -9,8 +21,8 @@ let test_query_case1 () =
   | Error s -> Alcotest.failf "query failed: %s" s
 
 let test_query_case2 () =
-  let con = connect in_memory_database in
-
+  setup_db @@ fun pool ->
+  use pool @@ fun con ->
   let stmt = prepare con "CREATE TABLE t (id INTEGER)" in
   let res = execute stmt [] in
   assert (res = Ok ());
@@ -41,6 +53,29 @@ let test_query_case2 () =
 
   ()
 
+let test_query_case3 () =
+  let npara = 100 in
+  setup_db @@ fun pool ->
+  let f =
+    use pool (fun con ->
+        execute (prepare con "CREATE TABLE t (id INTEGER)") [] |> Result.get_ok;
+        iota npara
+        |> List.iter (fun i ->
+               execute (prepare con "INSERT INTO t VALUES (?)") [ Int i ]
+               |> Result.get_ok));%lwt
+    iota npara
+    |> Lwt_list.map_p (fun i ->
+           use pool (fun con ->
+               match
+                 query (prepare con "SELECT id FROM t WHERE id = ?") [ Int i ]
+               with
+               | Ok [ [ Int j ] ] -> j
+               | _ -> Alcotest.failf "query failed"))
+  in
+  let got = Lwt_main.run f in
+  assert (List.sort compare got = iota npara);
+  Lwt.return_unit
+
 let () =
   let open Alcotest in
   run "datastore"
@@ -49,5 +84,6 @@ let () =
         [
           test_case "case1" `Quick test_query_case1;
           test_case "case2" `Quick test_query_case2;
+          test_case "case3" `Quick test_query_case3;
         ] );
     ]
