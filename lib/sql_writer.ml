@@ -22,7 +22,7 @@ CREATE TABLE accounts (
   kind INTEGER NOT NULL,
 
   UNIQUE (name, currency, parent_id)
-)|}
+) STRICT|}
 
     let create_transactions =
       {|
@@ -30,7 +30,7 @@ CREATE TABLE transactions (
   id INTEGER PRIMARY KEY,
   created_at TEXT NOT NULL,
   narration TEXT NOT NULL
-)|}
+) STRICT|}
 
     let create_postings =
       {|
@@ -44,7 +44,7 @@ CREATE TABLE postings (
   price INTEGER,
   FOREIGN KEY (account_id) REFERENCES accounts (id),
   FOREIGN KEY (transaction_id) REFERENCES transactions (id)
-)|}
+) STRICT|}
 
     let create_full_accounts_view =
       {|
@@ -62,25 +62,27 @@ SELECT id, name, currency, kind, depth FROM tree
 CREATE TABLE tags (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE
-)|}
+) STRICT|}
 
     let create_transaction_tag =
       {|
 CREATE TABLE transaction_tags (
   transaction_id INTEGER NOT NULL,
   tag_id INTEGER NOT NULL,
+  PRIMARY KEY (transaction_id, tag_id),
   FOREIGN KEY (transaction_id) REFERENCES transactions (id),
   FOREIGN KEY (tag_id) REFERENCES tags (id)
-)|}
+) STRICT|}
 
     let create_account_tag =
       {|
 CREATE TABLE account_tags (
   account_id INTEGER NOT NULL,
   tag_id INTEGER NOT NULL,
+  PRIMARY KEY (account_id, tag_id),
   FOREIGN KEY (account_id) REFERENCES accounts (id),
   FOREIGN KEY (tag_id) REFERENCES tags (id)
-)|}
+) STRICT|}
 
     let create_account_transactions_view account =
       (* FIXME: This query is insecure against SQL injection. *)
