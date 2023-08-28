@@ -470,6 +470,36 @@ let generate_json in_filename =
   let aux_err msg = `Assoc [ ("error", `String msg) ] in
   generate in_filename aux_ok aux_err
 
+let handle_query ~in_filename ~query =
+  let yojson_of_datastore_value = function
+    | Datastore.Text s -> `String s
+    | Int i -> `Int i
+    | Null -> `Null
+  in
+  let err msg = `Assoc [ ("error", `String msg) ] in
+  let thn con =
+    let sql_queries =
+      match query with
+      | `List xs ->
+          xs
+          |> List.map (function
+               | `String s -> s
+               | _ -> failwith "Invalid query")
+      | _ -> failwith "Invalid query"
+    in
+    sql_queries
+    |> List.map (fun q ->
+           match Datastore.(query (prepare con q) []) with
+           | Error s -> failwithf "Query error: %s" s
+           | Ok xs ->
+               xs
+               |> List.map (fun row ->
+                      `List (row |> List.map yojson_of_datastore_value))
+               |> fun xs -> `List xs)
+    |> fun xs -> `List xs
+  in
+  generate in_filename thn err
+
 let start_watching filepath streams =
   try%lwt
     Fsnotify.start_watching ~filepath (fun _ ->
@@ -502,6 +532,14 @@ let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
                  Lwt.return_unit) );
            ( Dream.get "/data.json" @@ fun _ ->
              Lwt_preemptive.detach (fun () -> generate_json in_filename) ()
+             >|= Yojson.Safe.to_string
+             >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
+           ( Dream.post "/query" @@ fun req ->
+             let%lwt body = Dream.body req in
+             Lwt_preemptive.detach
+               (fun () ->
+                 handle_query ~in_filename ~query:(Yojson.Safe.from_string body))
+               ()
              >|= Yojson.Safe.to_string
              >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
          ]
