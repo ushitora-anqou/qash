@@ -68,7 +68,7 @@ let load_file filename =
                    ({ t with transactions }, notes)
                | Import { filename; transactions = overlay } ->
                    let filepath = Filename.concat wd filename in
-                   let (t' : Model.t), (notes : note list) = aux filepath in
+                   let (t' : Model.t), (notes' : note list) = aux filepath in
                    if t'.accounts <> [] then
                      failwith "imported file should not contain open-account"
                    else
@@ -81,7 +81,7 @@ let load_file filename =
                              |> overwrite_transactions t'.transactions
                              |> List.filter is_nonempty_transaction);
                        },
-                       notes )
+                       notes' @ notes )
                | Assert s -> (t, Assert s :: notes)
                | Show s -> (t, Show s :: notes))
              ({ accounts = []; transactions = [] }, [])
