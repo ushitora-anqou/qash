@@ -451,19 +451,27 @@ let get_models ~year ~depth con =
     ("cashflow100", model_cashflow100);
   ]
 
-let generate in_filename thn err =
-  try
-    let m, notes = Loader.load_file in_filename in
-    let con = Sql_writer.dump_on_memory m in
-    match Verifier.verify con notes with
-    | Error s -> failwithf "Verification error: %s" s
-    | Ok () ->
-        Fun.protect
-          (fun () -> thn con)
-          ~finally:(fun () -> Datastore.disconnect con)
-  with e ->
-    let message = match e with Failure s -> s | _ -> Printexc.to_string e in
-    err message
+let generate =
+  let mtx = Lwt_mutex.create () in
+  fun in_filename thn err ->
+    try%lwt
+      let%lwt m, notes =
+        Lwt_mutex.with_lock mtx (fun () ->
+            Loader.load_file in_filename |> Lwt.return)
+      in
+      Lwt_preemptive.detach
+        (fun () ->
+          let con = Sql_writer.dump_on_memory m in
+          match Verifier.verify con notes with
+          | Error s -> failwithf "Verification error: %s" s
+          | Ok () ->
+              Fun.protect
+                (fun () -> thn con)
+                ~finally:(fun () -> Datastore.disconnect con))
+        ()
+    with e ->
+      let message = match e with Failure s -> s | _ -> Printexc.to_string e in
+      err message |> Lwt.return
 
 let generate_json in_filename =
   let aux_ok con = get_models ~year:2023 ~depth:1 con |> fun xs -> `Assoc xs in
@@ -531,15 +539,11 @@ let serve ?(interface = "127.0.0.1") ?(port = 8080) in_filename =
                  Lwt.async (finalize_websocket_stream ws);
                  Lwt.return_unit) );
            ( Dream.get "/data.json" @@ fun _ ->
-             Lwt_preemptive.detach (fun () -> generate_json in_filename) ()
-             >|= Yojson.Safe.to_string
+             generate_json in_filename >|= Yojson.Safe.to_string
              >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
            ( Dream.post "/query" @@ fun req ->
              let%lwt body = Dream.body req in
-             Lwt_preemptive.detach
-               (fun () ->
-                 handle_query ~in_filename ~query:(Yojson.Safe.from_string body))
-               ()
+             handle_query ~in_filename ~query:(Yojson.Safe.from_string body)
              >|= Yojson.Safe.to_string
              >>= Dream.json ~headers:[ ("Access-Control-Allow-Origin", "*") ] );
          ]
