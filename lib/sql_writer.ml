@@ -107,7 +107,7 @@ SELECT t.id AS id,
        t.created_at AS created_at,
        t.narration AS narration,
        p.narration AS p_narration,
-       CASE a.name WHEN '%s' THEN '-- スプリット取引 --' ELSE a.name END AS account,
+       CASE a.name WHEN '%s' THEN '----- 諸口 -----' ELSE a.name END AS account,
        CASE a.name WHEN '%s' THEN p.amount ELSE -p.amount END AS amount,
        SUM(
          CASE a.name WHEN '%s' THEN p.amount ELSE -p.amount END
