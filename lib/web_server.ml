@@ -413,7 +413,26 @@ let get_model_cashflow ~year ~depth pool =
     (cashflow_in @ cashflow_out @ [ ("net", "net", cashflow) ])
   |> Lwt.return
 
-let get_yearly_models_asset_liability_expense_income ~depth ~year pool =
+let get_yearly_models ~depth ~year pool =
+  let conv column raw_data =
+    raw_data
+    |> List.map (fun (_, account_name, amount) ->
+           let amount =
+             match column with `Debt -> amount | `Credit -> -amount
+           in
+           `Assoc
+             [
+               ("account", `String account_name);
+               ("stack", `String "default");
+               ("data", `List [ `Int amount ]);
+             ])
+    |> fun xs ->
+    `Assoc
+      [
+        ("labels", `List [ `String (Printf.sprintf "%d" year) ]);
+        ("data", `List xs);
+      ]
+  in
   let aux ~account kind column : Yojson.Safe.t Lwt.t =
     let account = Model.int_of_account_kind account in
     (match kind with
@@ -426,18 +445,43 @@ let get_yearly_models_asset_liability_expense_income ~depth ~year pool =
           (Store.select_sum_amount ~depth ~kind:account
              ~start_date:(get_date year 0)
              ~end_date:(get_date (year + 1) 0)))
-    >|= fun raw_data ->
-    raw_data
-    |> List.map (fun (_, account_name, amount) ->
-           ( account_name,
-             `Int (match column with `Debt -> amount | `Credit -> -amount) ))
-    |> fun xs -> `Assoc xs
+    >|= conv column
   in
   let asset = aux ~account:Asset `Stock `Debt in
   let liability = aux ~account:Liability `Stock `Credit in
   let expense = aux ~account:Expense `Flow `Debt in
   let income = aux ~account:Income `Flow `Credit in
   Lwt.both asset (Lwt.both liability (Lwt.both expense income))
+
+let get_yearly_models_cashflow ~depth ~year pool =
+  let conv stack raw_data =
+    raw_data
+    |> List.map (fun (_, account_name, amount) ->
+           `Assoc
+             [
+               ("account", `String account_name);
+               ("stack", `String stack);
+               ("data", `List [ `Int amount ]);
+             ])
+  in
+  let cashflow_in =
+    Datastore.use pool
+      (Store.select_cashflow_in ~depth ~start_date:(get_date year 0)
+         ~end_date:(get_date (year + 1) 0))
+    >|= conv "in"
+  in
+  let cashflow_out =
+    Datastore.use pool
+      (Store.select_cashflow_out ~depth ~start_date:(get_date year 0)
+         ~end_date:(get_date (year + 1) 0))
+    >|= conv "out"
+  in
+  Lwt.both cashflow_in cashflow_out >|= fun (cashflow_in, cashflow_out) ->
+  `Assoc
+    [
+      ("labels", `List [ `String (Printf.sprintf "%d" year) ]);
+      ("data", `List (cashflow_in @ cashflow_out));
+    ]
 
 let get_models ~year ~depth pool =
   let u = Datastore.use pool in
@@ -449,6 +493,10 @@ let get_models ~year ~depth pool =
   in
   let model_cashflow100 =
     get_model_cashflow ~year ~depth:100 pool >|= fun x -> ("cashflow100", x)
+  in
+  let yearly_model_cashflow =
+    get_yearly_models_cashflow ~depth:100 ~year pool >|= fun cashflow ->
+    ("cashflow_yearly", cashflow)
   in
   let model =
     get_models_asset_liability_expense_income ~depth ~year pool
@@ -471,7 +519,7 @@ let get_models ~year ~depth pool =
     ]
   in
   let yearly_model =
-    get_yearly_models_asset_liability_expense_income ~depth:100 ~year pool
+    get_yearly_models ~depth:100 ~year pool
     >|= fun (asset, (liability, (expense, income))) ->
     [
       ("asset_yearly", asset);
@@ -482,7 +530,14 @@ let get_models ~year ~depth pool =
   in
 
   let%lwt result0 =
-    Lwt.all [ model_gl; model_accounts; model_cashflow; model_cashflow100 ]
+    Lwt.all
+      [
+        model_gl;
+        model_accounts;
+        model_cashflow;
+        model_cashflow100;
+        yearly_model_cashflow;
+      ]
   in
   let%lwt result1 = Lwt.all [ model; model100; yearly_model ] in
   Lwt.return (result0 @ List.flatten result1)

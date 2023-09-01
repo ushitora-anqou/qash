@@ -236,8 +236,9 @@ let dump_account_id_map (model : Model.t) =
   (* (partial) account name -> int *)
   model.accounts
   |> List.map (fun (a : Model.open_account) -> a.account)
-  |> List.flatten |> List.sort_uniq compare
+  |> List.flatten
   |> List.mapi (fun i n -> (n, i))
+  |> List.sort_uniq (fun (l, _) (r, _) -> compare l r)
   |> List.to_seq |> StringMap.of_seq
 
 let dump_tag_id_map (model : Model.t) =

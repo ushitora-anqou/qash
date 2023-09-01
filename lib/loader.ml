@@ -86,6 +86,13 @@ let load_file' mtx filename =
                | Assert s -> (t, Assert s :: notes)
                | Show s -> (t, Show s :: notes))
              ({ accounts = []; transactions = [] }, [])
+        |> fun ((t : Model.t), (notes : note list)) ->
+        ( Model.
+            {
+              accounts = List.rev t.accounts;
+              transactions = List.rev t.transactions;
+            },
+          List.rev notes )
   in
   let model, notes = aux filename in
   Lwt.return (model, List.rev notes)
