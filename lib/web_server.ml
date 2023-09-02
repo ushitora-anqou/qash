@@ -88,7 +88,7 @@ cash_account_ids AS (
   WHERE t.name = '#cash'
 ),
 target_postings AS (
-  SELECT p2.*
+  SELECT DISTINCT p2.*
   FROM postings p1, postings p2
   WHERE p1.transaction_id = p2.transaction_id
   AND p1.account_id IN ( SELECT * FROM cash_account_ids )
@@ -121,7 +121,7 @@ cash_account_ids AS (
   WHERE t.name = '#cash'
 ),
 target_postings AS (
-  SELECT p2.*
+  SELECT DISTINCT p2.*
   FROM postings p1, postings p2
   WHERE p1.transaction_id = p2.transaction_id
   AND p1.account_id IN ( SELECT * FROM cash_account_ids )
