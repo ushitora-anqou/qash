@@ -45,8 +45,9 @@ let verify_notes pool notes =
            | Loader.Show sql -> (
                match Datastore.(query (prepare con sql) []) with
                | Error msg -> failwithf "Error !show: %s\n" msg
+               | Ok [] | Ok [ [ Null ] ] -> ()
                | Ok [ [ Text s ] ] -> Printf.printf "%s\n" s
-               | _ -> failwith "Error !show: invalid result")
+               | _ -> failwithf "Error !show: invalid result:\n%s" sql)
            | Assert sql -> (
                match Datastore.(query (prepare con sql) []) with
                | Error msg -> failwithf "Error !assert: %s\n" msg
