@@ -27,15 +27,6 @@ let test_overwrite () =
     = Model.
         [
           make_transaction
-            ~date:(make_date ~year:2023 ~month:5 ~day:8)
-            ~narration:"コンビニ" ~tags:[ "#タグ1"; "#タグ2" ]
-            ~postings:
-              [
-                make_posting ~account:[ "資産"; "流動資産"; "現金" ] ~amount:(-502) ();
-                make_posting ~account:[ "費用"; "食費" ] ~amount:502 ();
-              ]
-            ();
-          make_transaction
             ~date:(make_date ~year:2023 ~month:5 ~day:9)
             ~narration:"コンビニ ふが"
             ~postings:
@@ -43,6 +34,15 @@ let test_overwrite () =
                 make_posting ~account:[ "資産"; "流動資産"; "現金" ] ~amount:(-1502) ();
                 make_posting ~account:[ "費用"; "食費" ] ~amount:1300 ();
                 make_posting ~account:[ "資産"; "立替金" ] ~amount:202 ();
+              ]
+            ();
+          make_transaction
+            ~date:(make_date ~year:2023 ~month:5 ~day:8)
+            ~narration:"コンビニ" ~tags:[ "#タグ1"; "#タグ2" ]
+            ~postings:
+              [
+                make_posting ~account:[ "資産"; "流動資産"; "現金" ] ~amount:(-502) ();
+                make_posting ~account:[ "費用"; "食費" ] ~amount:502 ();
               ]
             ();
         ]);
