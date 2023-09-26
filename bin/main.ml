@@ -39,6 +39,11 @@ let () =
             const generate
             $ Arg.(
                 required & pos 0 (some int) None & info ~docv:"NUM-ENTRIES" []));
+        v (info "dump-data-json")
+          Term.(
+            const dump_data_json
+            $ Arg.(
+                required & pos 0 (some string) None & info ~docv:"IN-FILE" []));
       ]
     |> eval)
   |> exit

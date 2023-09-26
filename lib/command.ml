@@ -59,3 +59,8 @@ let serve =
 
 let generate num_entries =
   Generator.generate_sample num_entries |> print_endline
+
+let dump_data_json in_filename =
+  Lwt_main.run
+    (Web_server.generate_json in_filename
+    >|= Yojson.Safe.to_string >|= print_string)
