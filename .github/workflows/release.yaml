@@ -1,0 +1,26 @@
+name: Release Qash
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set-up OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 5.0
+      - run: opam install . --deps-only --with-test
+      - run: opam exec -- dune build
+      - run: cp _build/default/bin/main.exe qash
+      - uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifacts: qash
+
