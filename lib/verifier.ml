@@ -36,7 +36,7 @@ let verify_balanced_transactions pool =
       |> Printf.sprintf "Unbalanced transactions:\n%s")
   else Ok ()
 
-let verify_notes pool notes =
+let verify_notes ?(print = true) pool notes =
   Datastore.use pool @@ fun con ->
   try
     notes
@@ -46,7 +46,7 @@ let verify_notes pool notes =
                match Datastore.(query (prepare con sql) []) with
                | Error msg -> failwithf "Error !show: %s\n" msg
                | Ok [] | Ok [ [ Null ] ] -> ()
-               | Ok [ [ Text s ] ] -> Printf.printf "%s\n" s
+               | Ok [ [ Text s ] ] -> if print then Printf.printf "%s\n" s
                | _ -> failwithf "Error !show: invalid result:\n%s" sql)
            | Assert sql -> (
                match Datastore.(query (prepare con sql) []) with
@@ -57,8 +57,8 @@ let verify_notes pool notes =
     Ok ()
   with Failure s -> Error s
 
-let verify pool notes =
+let verify ?print pool notes =
   let ( let* ) = Lwt_result.bind in
   let* () = verify_balanced_transactions pool in
-  let* () = verify_notes pool notes in
+  let* () = verify_notes ?print pool notes in
   Lwt.return_ok ()

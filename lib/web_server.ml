@@ -545,7 +545,7 @@ let generate in_filename thn err =
   try%lwt
     let%lwt m, notes = Loader.load_file in_filename in
     Sql_writer.with_dump_file m @@ fun pool ->
-    match%lwt Verifier.verify pool notes with
+    match%lwt Verifier.verify ~print:false pool notes with
     | Error s -> failwithf "Verification error: %s" s
     | Ok () ->
         Lwt.finalize (fun () -> thn pool) (fun () -> Datastore.close_db pool)
