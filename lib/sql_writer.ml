@@ -300,8 +300,12 @@ let dump_transaction_records_and_posting_records (model : Model.t)
            (tx.postings
            |> List.mapi (fun i (p : Model.posting) ->
                   let ps_id = List.length ps_recs + i in
+                  let account_name = list_last p.account in
                   let acc_id =
-                    account_id_map |> StringMap.find (list_last p.account)
+                    try account_id_map |> StringMap.find account_name
+                    with Not_found ->
+                      failwith
+                        (Printf.sprintf "account not found: %s" account_name)
                   in
                   (ps_id, acc_id, tx_id, Option.get p.amount, p.narration)))
            @ ps_recs
