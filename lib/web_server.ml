@@ -551,6 +551,7 @@ let generate in_filename thn err =
         Lwt.finalize (fun () -> thn pool) (fun () -> Datastore.close_db pool)
   with e ->
     let message = match e with Failure s -> s | _ -> Printexc.to_string e in
+    let message = message ^ "\n" ^ (Printexc.get_backtrace ()) in
     err message
 
 let generate_json in_filename =
