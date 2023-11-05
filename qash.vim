@@ -6,7 +6,7 @@ syntax clear
 
 syntax match qashCommand "!open-account\|!import"
 syntax match qashKeyword "asset\|expense\|equity\|income\|liability"
-syntax match qashNumber "-\?\d\+"
+syntax match qashNumber "-\?[0-9,]\+"
 syntax match qashDate "\d\{4}-\d\{2}-\d\{2}"
 syntax match qashLineComment "//.\+"
 syntax match qashTag "#.\+"
