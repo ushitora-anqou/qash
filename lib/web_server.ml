@@ -483,10 +483,6 @@ let get_yearly_models_cashflow ~depth ~year pool =
     ]
 
 let get_models ~year ~depth pool =
-  let u = Datastore.use pool in
-
-  let model_gl = u get_model_gl >|= fun x -> ("gl", x) in
-  let model_accounts = u get_model_accounts >|= fun x -> ("account", x) in
   let model_cashflow =
     get_model_cashflow ~year ~depth pool >|= fun x -> ("cashflow", x)
   in
@@ -529,17 +525,10 @@ let get_models ~year ~depth pool =
   in
 
   let%lwt result0 =
-    Lwt.all
-      [
-        model_gl;
-        model_accounts;
-        model_cashflow;
-        model_cashflow100;
-        yearly_model_cashflow;
-      ]
+    Lwt.all [ model_cashflow; model_cashflow100; yearly_model_cashflow ]
   in
   let%lwt result1 = Lwt.all [ model; model100; yearly_model ] in
-  Lwt.return (result0 @ List.flatten result1)
+  Lwt.return (`Assoc (result0 @ List.flatten result1))
 
 let generate in_filename thn err =
   try%lwt
@@ -551,12 +540,25 @@ let generate in_filename thn err =
         Lwt.finalize (fun () -> thn pool) (fun () -> Datastore.close_db pool)
   with e ->
     let message = match e with Failure s -> s | _ -> Printexc.to_string e in
-    let message = message ^ "\n" ^ (Printexc.get_backtrace ()) in
+    let message = message ^ "\n" ^ Printexc.get_backtrace () in
     err message
 
 let generate_json in_filename =
   let aux_ok pool =
-    get_models ~year:2023 ~depth:1 pool >|= fun xs -> `Assoc xs
+    let%lwt model_gl = Datastore.use pool get_model_gl in
+    let%lwt model_account = Datastore.use pool get_model_accounts in
+    let%lwt models_2022 = get_models ~year:2022 ~depth:1 pool in
+    let%lwt models_2023 = get_models ~year:2023 ~depth:1 pool in
+    let%lwt models_2024 = get_models ~year:2024 ~depth:1 pool in
+    `Assoc
+      [
+        ("gl", model_gl);
+        ("account", model_account);
+        ("2022", models_2022);
+        ("2023", models_2023);
+        ("2024", models_2024);
+      ]
+    |> Lwt.return
   in
   let aux_err msg = `Assoc [ ("error", `String msg) ] |> Lwt.return in
   generate in_filename aux_ok aux_err
