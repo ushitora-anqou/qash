@@ -290,7 +290,7 @@ let decode_monthly_data
 let format_monthly_data_for_json year raw_data : Yojson.Safe.t =
   let get_monthly_labels year =
     iota 12
-    |> List.map (fun i -> `String (Printf.sprintf "%d-%02d-01" year (i + 1)))
+    |> List.map (fun i -> `String (Printf.sprintf "%d-%02d" year (i + 1)))
   in
   let labels = get_monthly_labels year in
   let data =
@@ -349,10 +349,10 @@ let get_models_asset_liability_expense_income ~depth ~year pool =
         match kind with
         | `Stock ->
             Store.select_cumulative_sum_amount ~depth ~kind:account
-              ~end_date:(get_date year i) con
+              ~end_date:(get_next_date year i) con
         | `Flow ->
             Store.select_sum_amount ~depth ~kind:account
-              ~start_date:(get_prev_date year i) ~end_date:(get_date year i) con)
+              ~start_date:(get_date year i) ~end_date:(get_next_date year i) con)
     >|= fun data ->
     data
     |> List.map @@ fun (account_name, stack, data) ->
