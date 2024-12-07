@@ -33,3 +33,5 @@ misc
 .~lock.*
 *.sqlite3
 *.html
+.direnv
+result
