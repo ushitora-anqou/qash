@@ -13,19 +13,21 @@
         on = opam-nix.lib.${system};
         devPackagesQuery = {
           # You can add "development" packages here. They will get added to the devShell automatically.
-          ocaml-lsp-server = "*";
-          ocamlformat = "0.26.0";
+          #ocaml-lsp-server = "*";
+          #ocamlformat = "0.26.0";
         };
         query = devPackagesQuery // {
           ## You can force versions of certain packages here, e.g:
           ## - force the ocaml compiler to be taken from opam-repository:
-          ocaml-base-compiler = "*";
+          #ocaml-base-compiler = "*";
           ## - or force the compiler to be taken from nixpkgs and be a certain version:
           # ocaml-system = "4.14.0";
           ## - or force ocamlfind to be a certain version:
           # ocamlfind = "1.9.2";
         };
-        scope = on.buildOpamProject' { } ./. query;
+        scope = on.buildOpamProject' {
+          resolveArgs = { with-test = true; with-doc = true; };
+        } ./. query;
         overlay = final: prev: {
           # You can add overrides here
           ${package} = prev.${package}.overrideAttrs (_: {
