@@ -550,6 +550,7 @@ let generate_json in_filename =
     let%lwt models_2022 = get_models ~year:2022 ~depth:1 pool in
     let%lwt models_2023 = get_models ~year:2023 ~depth:1 pool in
     let%lwt models_2024 = get_models ~year:2024 ~depth:1 pool in
+    let%lwt models_2025 = get_models ~year:2025 ~depth:1 pool in
     `Assoc
       [
         ("gl", model_gl);
@@ -557,6 +558,7 @@ let generate_json in_filename =
         ("2022", models_2022);
         ("2023", models_2023);
         ("2024", models_2024);
+        ("2025", models_2025);
       ]
     |> Lwt.return
   in
