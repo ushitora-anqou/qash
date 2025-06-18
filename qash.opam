@@ -20,14 +20,11 @@ depends: [
   "lwt_ppx"
   "menhir"
   "ocaml"
-  "ocaml-lsp-server" {dev}
-  "ocamlformat" {dev & = "0.26.2"}
   "odoc" {with-doc}
   "pcre"
   "ppx_deriving"
-  "ppx_yojson_conv" {<= "v0.15.1"}
+  "ppx_yojson_conv"
   "sqlite3"
-  "utop" {dev}
   "yojson"
 ]
 build: [
