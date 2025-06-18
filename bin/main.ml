@@ -44,6 +44,12 @@ let () =
             const dump_data_json
             $ Arg.(
                 required & pos 0 (some string) None & info ~docv:"IN-FILE" []));
+        v (info "dump-pg")
+          Term.(
+            const dump_pg
+            $ Arg.(
+                required & pos 0 (some string) None & info ~docv:"IN-FILE" [])
+            $ Arg.(required & pos 1 (some string) None & info ~docv:"DSN" []));
       ]
     |> eval)
   |> exit

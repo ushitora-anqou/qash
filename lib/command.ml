@@ -64,3 +64,9 @@ let dump_data_json in_filename =
   Lwt_main.run
     (Web_server.generate_json in_filename
     >|= Yojson.Safe.to_string >|= print_string)
+
+let dump_pg in_filename dsn =
+  Lwt_main.run
+  @@
+  let%lwt m, _ = Loader.load_file in_filename in
+  Sql_writer.dump_pg dsn m >|= fun _ -> ()

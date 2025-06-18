@@ -12,6 +12,7 @@ doc: "https://github.com/ushitora-anqou/qash"
 bug-reports: "https://github.com/ushitora-anqou/qash/issues"
 depends: [
   "alcotest" {with-test}
+  "alcotest-lwt"
   "csv"
   "dream"
   "dune" {>= "3.8"}
@@ -22,6 +23,7 @@ depends: [
   "ocaml"
   "odoc" {with-doc}
   "pcre"
+  "postgresql"
   "ppx_deriving"
   "ppx_yojson_conv"
   "sqlite3"
