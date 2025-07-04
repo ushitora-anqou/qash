@@ -26,7 +26,7 @@
           # ocamlfind = "1.9.2";
         };
         scope = on.buildOpamProject' {
-          resolveArgs = { with-test = true; with-doc = true; };
+          #resolveArgs = { with-test = true; with-doc = true; };
         } ./. query;
         overlay = final: prev: {
           # You can add overrides here
